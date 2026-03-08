@@ -43,7 +43,9 @@ done
 
 echo "[3/4] Generating checksums..."
 cd release
-sha256sum telemt-panel-* > SHA256SUMS
+for bin in telemt-panel-*; do
+  sha256sum "$bin" > "${bin}.sha256"
+done
 cd ..
 
 echo "[4/4] Done!"

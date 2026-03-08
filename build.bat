@@ -33,7 +33,11 @@ docker create --name tpb-arm64 telemt-panel-builder-arm64 >nul 2>&1
 docker cp tpb-arm64:/usr/local/bin/telemt-panel ./release/telemt-panel-aarch64-linux
 docker rm tpb-arm64 >nul 2>&1
 
-echo [2/3] Done!
+echo [2/3] Generating checksums...
+certutil -hashfile release\telemt-panel-x86_64-linux SHA256 | findstr /v ":" > release\telemt-panel-x86_64-linux.sha256
+certutil -hashfile release\telemt-panel-aarch64-linux SHA256 | findstr /v ":" > release\telemt-panel-aarch64-linux.sha256
+
+echo [3/3] Done!
 echo.
 echo Binaries in .\release\:
 dir /b release\

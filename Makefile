@@ -16,7 +16,7 @@ release: frontend
 	@mkdir -p release
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -o release/telemt-panel-x86_64-linux .
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -o release/telemt-panel-aarch64-linux .
-	cd release && sha256sum telemt-panel-* > SHA256SUMS
+	cd release && for bin in telemt-panel-*; do sha256sum "$$bin" > "$${bin}.sha256"; done
 	@echo "Binaries in ./release/"
 
 clean:
