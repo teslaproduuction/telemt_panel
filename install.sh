@@ -37,9 +37,18 @@ else
     echo "Error: Could not determine latest release. Install Go and Node to build from source."
     exit 1
   fi
-  curl -sL "https://github.com/$REPO/releases/download/$LATEST/telemt-panel-$ARCH-linux" -o /tmp/telemt-panel
-  sudo chmod +x /tmp/telemt-panel
-  sudo mv /tmp/telemt-panel "$INSTALL_DIR/telemt-panel"
+
+  TARBALL="telemt-panel-$ARCH-linux-gnu.tar.gz"
+  echo "Downloading $TARBALL..."
+  curl -sL "https://github.com/$REPO/releases/download/$LATEST/$TARBALL" -o "/tmp/$TARBALL"
+
+  echo "Extracting binary..."
+  tar -xzf "/tmp/$TARBALL" -C /tmp
+
+  BINARY_NAME="telemt-panel-$ARCH-linux"
+  sudo chmod +x "/tmp/$BINARY_NAME"
+  sudo mv "/tmp/$BINARY_NAME" "$INSTALL_DIR/telemt-panel"
+  rm -f "/tmp/$TARBALL"
 fi
 
 echo "Installed to $INSTALL_DIR/telemt-panel"
