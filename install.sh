@@ -59,6 +59,10 @@ if ! id telemt-panel &>/dev/null; then
   echo "Created system user: telemt-panel"
 fi
 
+# Set ownership so panel can update itself
+sudo chown telemt-panel:telemt-panel "$INSTALL_DIR/telemt-panel"
+echo "Set ownership to telemt-panel user"
+
 # Config directory
 sudo mkdir -p "$CONFIG_DIR"
 
@@ -115,7 +119,6 @@ Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
 NoNewPrivileges=true
-ProtectSystem=strict
 ProtectHome=true
 ReadOnlyPaths=/etc/telemt-panel
 

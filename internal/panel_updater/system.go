@@ -128,7 +128,9 @@ func BackupBinary(binaryPath string) error {
 	}
 	defer src.Close()
 
-	dst, err := os.Create(binaryPath + ".bak")
+	// Create backup in /tmp instead of same directory
+	backupPath := filepath.Join("/tmp", filepath.Base(binaryPath)+".bak")
+	dst, err := os.Create(backupPath)
 	if err != nil {
 		return err
 	}
@@ -142,11 +144,12 @@ func BackupBinary(binaryPath string) error {
 	if err != nil {
 		return err
 	}
-	return os.Chmod(binaryPath+".bak", info.Mode())
+	return os.Chmod(backupPath, info.Mode())
 }
 
 func RestoreBackup(binaryPath string) error {
-	return os.Rename(binaryPath+".bak", binaryPath)
+	backupPath := filepath.Join("/tmp", filepath.Base(binaryPath)+".bak")
+	return os.Rename(backupPath, binaryPath)
 }
 
 func RestartService(serviceName string) error {
