@@ -1,0 +1,38 @@
+# Telemt Panel Configuration
+
+# Address and port the panel listens on
+listen = "0.0.0.0:8080"
+
+[telemt]
+# Telemt API base URL (no trailing slash)
+url = "http://127.0.0.1:2398"
+# Authorization header value sent to Telemt API
+auth_header = "your-telemt-api-secret"
+# Path to telemt binary (default: /bin/telemt)
+# binary_path = "/bin/telemt"
+# Systemd service name (default: telemt)
+# service_name = "telemt"
+# GitHub repository for update checks (default: telemt/telemt)
+# github_repo = "telemt/telemt"
+
+[tls]
+# Option 1: Custom certificates
+# cert_file = "/path/to/cert.pem"
+# key_file = "/path/to/key.pem"
+
+# Option 2: Automatic Let's Encrypt (requires port 443 + port 80 for challenges)
+# acme_domain = "panel.example.com"
+# acme_cache_dir = "/var/lib/telemt-panel/certs"  # default
+
+# Note: cert_file and acme_domain are mutually exclusive.
+# If neither is set, the panel runs on plain HTTP.
+
+[auth]
+# Panel admin credentials
+username = "admin"
+# Generate with: telemt-panel hash-password
+password_hash = "$2a$10$CHANGE_ME"
+# Secret key for JWT signing (use a random string, min 32 chars)
+jwt_secret = "change-me-to-a-random-string-at-least-32-chars"
+# Session duration
+session_ttl = "24h"
