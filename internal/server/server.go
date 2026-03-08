@@ -12,6 +12,7 @@ import (
 
 	"github.com/telemt/telemt-panel/internal/auth"
 	"github.com/telemt/telemt-panel/internal/config"
+	"github.com/telemt/telemt-panel/internal/panel_updater"
 	"github.com/telemt/telemt-panel/internal/proxy"
 	"github.com/telemt/telemt-panel/internal/spa"
 	"github.com/telemt/telemt-panel/internal/updater"
@@ -91,7 +92,7 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 	})
 }
 
-func (s *Server) Run(distFS fs.FS) error {
+func (s *Server) Run(version string, distFS fs.FS) error {
 	jwtSecret := []byte(s.cfg.Auth.JWTSecret)
 
 	ttl, err := time.ParseDuration(s.cfg.Auth.SessionTTL)
@@ -205,6 +206,35 @@ func (s *Server) Run(distFS fs.FS) error {
 
 	mux.Handle("GET /api/update/status", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: upd.GetStatus()})
+	})))
+
+	// Panel update endpoints
+	panelUpd := panel_updater.New(
+		version,
+		s.cfg.Panel.BinaryPath,
+		s.cfg.Panel.ServiceName,
+		s.cfg.Panel.GithubRepo,
+	)
+
+	mux.Handle("GET /api/panel/update/check", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result, err := panelUpd.Check()
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "update_check_failed", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: result})
+	})))
+
+	mux.Handle("POST /api/panel/update/apply", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := panelUpd.Apply(); err != nil {
+			writeError(w, http.StatusConflict, "update_in_progress", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: panelUpd.GetStatus()})
+	})))
+
+	mux.Handle("GET /api/panel/update/status", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: panelUpd.GetStatus()})
 	})))
 
 	// Telemt API proxy (kept for direct REST calls like user CRUD)

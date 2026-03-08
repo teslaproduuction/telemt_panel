@@ -13,6 +13,7 @@ import (
 type Config struct {
 	Listen string       `toml:"listen"`
 	Telemt TelemtConfig `toml:"telemt"`
+	Panel  PanelConfig  `toml:"panel"`
 	Auth   AuthConfig   `toml:"auth"`
 	TLS    TLSConfig    `toml:"tls"`
 }
@@ -27,6 +28,12 @@ type TLSConfig struct {
 type TelemtConfig struct {
 	URL         string `toml:"url"`
 	AuthHeader  string `toml:"auth_header"`
+	BinaryPath  string `toml:"binary_path"`
+	ServiceName string `toml:"service_name"`
+	GithubRepo  string `toml:"github_repo"`
+}
+
+type PanelConfig struct {
 	BinaryPath  string `toml:"binary_path"`
 	ServiceName string `toml:"service_name"`
 	GithubRepo  string `toml:"github_repo"`
@@ -64,6 +71,16 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Telemt.GithubRepo == "" {
 		cfg.Telemt.GithubRepo = "telemt/telemt"
+	}
+
+	if cfg.Panel.BinaryPath == "" {
+		cfg.Panel.BinaryPath = "/usr/local/bin/telemt-panel"
+	}
+	if cfg.Panel.ServiceName == "" {
+		cfg.Panel.ServiceName = "telemt-panel"
+	}
+	if cfg.Panel.GithubRepo == "" {
+		cfg.Panel.GithubRepo = "telemt/telemt-panel"
 	}
 
 	if cfg.TLS.AcmeCacheDir == "" {

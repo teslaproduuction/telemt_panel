@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"golang.org/x/term"
 
@@ -22,13 +24,25 @@ func main() {
 	}
 
 	if len(os.Args) > 1 && os.Args[1] == "hash-password" {
-		fmt.Print("Enter password: ")
-		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Println() // newline after hidden input
-		if err != nil {
-			log.Fatalf("Failed to read password: %v", err)
+		var password string
+		if term.IsTerminal(int(os.Stdin.Fd())) {
+			fmt.Print("Enter password: ")
+			passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+			fmt.Println()
+			if err != nil {
+				log.Fatalf("Failed to read password: %v", err)
+			}
+			password = string(passwordBytes)
+		} else {
+			scanner := bufio.NewScanner(os.Stdin)
+			if scanner.Scan() {
+				password = strings.TrimSpace(scanner.Text())
+			}
+			if password == "" {
+				log.Fatal("No password provided on stdin")
+			}
 		}
-		hash, err := auth.HashPassword(string(passwordBytes))
+		hash, err := auth.HashPassword(password)
 		if err != nil {
 			log.Fatalf("Failed to hash password: %v", err)
 		}
@@ -45,5 +59,5 @@ func main() {
 	}
 
 	srv := server.New(cfg)
-	log.Fatal(srv.Run(distFS))
+	log.Fatal(srv.Run(version, distFS))
 }

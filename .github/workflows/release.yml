@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Build binaries
+        run: |
+          VERSION="${{ github.ref_name }}"
+
+          # Build for x86_64
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+            -ldflags="-s -w -X main.version=${VERSION}" \
+            -o telemt-panel-x86_64-linux \
+            .
+
+          # Build for aarch64
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build \
+            -ldflags="-s -w -X main.version=${VERSION}" \
+            -o telemt-panel-aarch64-linux \
+            .
+
+      - name: Package binaries
+        run: |
+          tar -czf telemt-panel-x86_64-linux-gnu.tar.gz telemt-panel-x86_64-linux
+          tar -czf telemt-panel-aarch64-linux-gnu.tar.gz telemt-panel-aarch64-linux
+
+      - name: Generate checksums
+        run: |
+          sha256sum telemt-panel-x86_64-linux-gnu.tar.gz > telemt-panel-x86_64-linux-gnu.sha256
+          sha256sum telemt-panel-aarch64-linux-gnu.tar.gz > telemt-panel-aarch64-linux-gnu.sha256
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          files: |
+            telemt-panel-x86_64-linux-gnu.tar.gz
+            telemt-panel-x86_64-linux-gnu.sha256
+            telemt-panel-aarch64-linux-gnu.tar.gz
+            telemt-panel-aarch64-linux-gnu.sha256
