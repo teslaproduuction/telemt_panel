@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func DownloadFile(url string) (string, error) {
@@ -128,8 +129,8 @@ func BackupBinary(binaryPath string) error {
 	}
 	defer src.Close()
 
-	// Create backup in /tmp instead of same directory
-	backupPath := filepath.Join("/tmp", filepath.Base(binaryPath)+".bak")
+	// Create backup with unique name in /tmp
+	backupPath := fmt.Sprintf("/tmp/%s.bak.%d", filepath.Base(binaryPath), time.Now().Unix())
 	dst, err := os.Create(backupPath)
 	if err != nil {
 		return err
@@ -148,7 +149,15 @@ func BackupBinary(binaryPath string) error {
 }
 
 func RestoreBackup(binaryPath string) error {
-	backupPath := filepath.Join("/tmp", filepath.Base(binaryPath)+".bak")
+	// Find the most recent backup
+	pattern := fmt.Sprintf("/tmp/%s.bak.*", filepath.Base(binaryPath))
+	matches, err := filepath.Glob(pattern)
+	if err != nil || len(matches) == 0 {
+		return fmt.Errorf("no backup found")
+	}
+
+	// Use the most recent backup (highest timestamp)
+	backupPath := matches[len(matches)-1]
 	return os.Rename(backupPath, binaryPath)
 }
 
