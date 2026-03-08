@@ -28,39 +28,41 @@ export function DataTable<T extends Record<string, unknown>>({
 }: DataTableProps<T>) {
   return (
     <div className="border border-border rounded-lg overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {columns.map((col) => (
-              <TableHead key={col.key}>{col.header}</TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.length === 0 ? (
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell
-                colSpan={columns.length}
-                className="text-center text-text-secondary py-8"
-              >
-                {emptyMessage}
-              </TableCell>
+              {columns.map((col) => (
+                <TableHead key={col.key} className="whitespace-nowrap">{col.header}</TableHead>
+              ))}
             </TableRow>
-          ) : (
-            data.map((row, i) => (
-              <TableRow key={String(row[keyField] ?? i)}>
-                {columns.map((col) => (
-                  <TableCell key={col.key}>
-                    {col.render
-                      ? col.render(row)
-                      : String(row[col.key] ?? '')}
-                  </TableCell>
-                ))}
+          </TableHeader>
+          <TableBody>
+            {data.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="text-center text-text-secondary py-8"
+                >
+                  {emptyMessage}
+                </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ) : (
+              data.map((row, i) => (
+                <TableRow key={String(row[keyField] ?? i)}>
+                  {columns.map((col) => (
+                    <TableCell key={col.key} className="whitespace-nowrap">
+                      {col.render
+                        ? col.render(row)
+                        : String(row[col.key] ?? '')}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

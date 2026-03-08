@@ -68,32 +68,32 @@ export function DashboardPage() {
     <div>
       <Header title="Dashboard" refreshing={!connected} onRefresh={refresh} />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
         {firstError && <ErrorAlert message={firstError} onRetry={refresh} />}
 
         {/* Health Banner */}
         <div
-          className={`rounded-lg border p-4 flex items-center gap-3 ${
+          className={`rounded-lg border p-3 lg:p-4 flex items-center gap-2 lg:gap-3 text-sm lg:text-base ${
             isHealthy
               ? 'bg-success/10 border-success/30'
               : 'bg-danger/10 border-danger/30'
           }`}
         >
           {isHealthy ? (
-            <Wifi size={20} className="text-success" />
+            <Wifi size={18} className="text-success shrink-0" />
           ) : (
-            <WifiOff size={20} className="text-danger" />
+            <WifiOff size={18} className="text-danger shrink-0" />
           )}
           <span className={`font-medium ${isHealthy ? 'text-success' : 'text-danger'}`}>
             {isHealthy ? 'Telemt is running' : 'Telemt is unreachable'}
           </span>
           {!connected && (
-            <span className="ml-auto text-xs text-warning bg-warning/15 px-2 py-1 rounded">
+            <span className="ml-auto text-xs text-warning bg-warning/15 px-2 py-1 rounded shrink-0">
               WS reconnecting...
             </span>
           )}
           {health?.read_only && (
-            <span className="ml-auto text-xs text-warning bg-warning/15 px-2 py-1 rounded">
+            <span className="ml-auto text-xs text-warning bg-warning/15 px-2 py-1 rounded shrink-0">
               READ-ONLY
             </span>
           )}
@@ -101,16 +101,16 @@ export function DashboardPage() {
 
         {/* Metric Cards */}
         {summary && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
             <MetricCard
               label="Uptime"
               value={formatUptime(summary.uptime_seconds)}
-              icon={<Clock size={16} />}
+              icon={<Clock size={14} className="lg:w-4 lg:h-4" />}
             />
             <MetricCard
               label="Total Connections"
               value={formatNumber(summary.connections_total)}
-              icon={<Activity size={16} />}
+              icon={<Activity size={14} className="lg:w-4 lg:h-4" />}
               variant="success"
             />
             <MetricCard
@@ -121,20 +121,20 @@ export function DashboardPage() {
             <MetricCard
               label="Configured Users"
               value={summary.configured_users}
-              icon={<Users size={16} />}
+              icon={<Users size={14} className="lg:w-4 lg:h-4" />}
             />
           </div>
         )}
 
         {/* System Info */}
         {system && (
-          <div className="bg-surface border border-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-text-secondary mb-3">System Info</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="bg-surface border border-border rounded-lg p-3 lg:p-4">
+            <h3 className="text-xs lg:text-sm font-medium text-text-secondary mb-2 lg:mb-3">System Info</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 lg:gap-3">
               {Object.entries(system).map(([key, value]) => (
                 <div key={key}>
                   <div className="text-xs text-text-secondary">{key.replace(/_/g, ' ')}</div>
-                  <div className="text-sm text-text-primary truncate">
+                  <div className="text-xs lg:text-sm text-text-primary truncate">
                     {typeof value === 'boolean' ? (
                       <StatusBadge status={value} />
                     ) : (
@@ -150,7 +150,7 @@ export function DashboardPage() {
         {/* DC Status */}
         {dcs?.dcs && dcs.dcs.length > 0 && (
           <div>
-            <h3 className="text-sm font-medium text-text-secondary mb-3">DC Status</h3>
+            <h3 className="text-xs lg:text-sm font-medium text-text-secondary mb-2 lg:mb-3">DC Status</h3>
             <DataTable
               columns={dcColumns}
               data={dcs.dcs}

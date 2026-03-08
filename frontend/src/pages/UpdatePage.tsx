@@ -162,40 +162,41 @@ export function UpdatePage() {
   return (
     <div className="min-h-screen">
       <Header title="Update" onRefresh={() => { handleCheck(); handlePanelCheck(); }} />
-      <div className="p-6 space-y-6 max-w-3xl">
+      <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 max-w-3xl">
 
         {/* Panel Update Section */}
-        <div className="bg-surface rounded-lg p-5 border border-border">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-text-primary">Panel Version</h2>
+        <div className="bg-surface rounded-lg p-4 lg:p-5 border border-border">
+          <div className="flex items-center justify-between mb-3 lg:mb-4">
+            <h2 className="text-xs lg:text-sm font-semibold text-text-primary">Panel Version</h2>
             <button
               onClick={handlePanelCheck}
               disabled={panelChecking || !!isPanelUpdating}
               className={cn(
-                'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                'flex items-center gap-1.5 lg:gap-2 px-2.5 lg:px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
                 'bg-accent/15 text-accent hover:bg-accent/25',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
-              <RefreshCw size={14} className={cn(panelChecking && 'animate-spin')} />
-              Check for updates
+              <RefreshCw size={12} className={cn('lg:w-3.5 lg:h-3.5', panelChecking && 'animate-spin')} />
+              <span className="hidden sm:inline">Check for updates</span>
+              <span className="sm:hidden">Check</span>
             </button>
           </div>
 
           {panelError && <ErrorAlert message={panelError} />}
 
           {panelCheckResult ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-3 lg:space-y-4">
+              <div className="grid grid-cols-2 gap-2 lg:gap-3">
                 <MetricCard label="Current Version" value={panelCheckResult.current_version} />
                 <MetricCard label="Latest Version" value={panelCheckResult.latest_version} />
               </div>
 
               {panelCheckResult.update_available ? (
-                <div className="bg-accent/10 border border-accent/30 rounded-md p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-accent">
+                <div className="bg-accent/10 border border-accent/30 rounded-md p-3 lg:p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs lg:text-sm font-medium text-accent">
                         Update available: {panelCheckResult.release_name}
                       </p>
                       <p className="text-xs text-text-secondary mt-1">
@@ -215,12 +216,12 @@ export function UpdatePage() {
                       onClick={handlePanelApply}
                       disabled={!!isPanelUpdating}
                       className={cn(
-                        'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
+                        'flex items-center justify-center gap-2 px-3 lg:px-4 py-2 rounded-md text-xs lg:text-sm font-medium transition-colors w-full sm:w-auto',
                         'bg-accent text-white hover:bg-accent/90',
                         'disabled:opacity-50 disabled:cursor-not-allowed'
                       )}
                     >
-                      <Download size={16} />
+                      <Download size={14} className="lg:w-4 lg:h-4" />
                       Update
                     </button>
                   </div>
@@ -230,21 +231,21 @@ export function UpdatePage() {
                       <summary className="text-xs text-text-secondary cursor-pointer hover:text-text-primary">
                         Changelog
                       </summary>
-                      <pre className="mt-2 text-xs text-text-secondary whitespace-pre-wrap bg-background rounded p-3 max-h-48 overflow-y-auto">
+                      <pre className="mt-2 text-xs text-text-secondary whitespace-pre-wrap bg-background rounded p-2 lg:p-3 max-h-48 overflow-y-auto">
                         {panelCheckResult.changelog}
                       </pre>
                     </details>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-sm text-success">
-                  <CheckCircle2 size={16} />
+                <div className="flex items-center gap-2 text-xs lg:text-sm text-success">
+                  <CheckCircle2 size={14} className="lg:w-4 lg:h-4" />
                   You are running the latest version
                 </div>
               )}
             </div>
           ) : (
-            <p className="text-sm text-text-secondary">
+            <p className="text-xs lg:text-sm text-text-secondary">
               Click "Check for updates" to see if a new version is available.
             </p>
           )}
@@ -252,22 +253,22 @@ export function UpdatePage() {
 
         {/* Panel Update Progress */}
         {panelStatus && panelStatus.phase !== 'idle' && (
-          <div className="bg-surface rounded-lg p-5 border border-border">
-            <h2 className="text-sm font-semibold text-text-primary mb-4">Panel Update Progress</h2>
+          <div className="bg-surface rounded-lg p-4 lg:p-5 border border-border">
+            <h2 className="text-xs lg:text-sm font-semibold text-text-primary mb-3 lg:mb-4">Panel Update Progress</h2>
 
             {/* Step indicators */}
-            <div className="flex items-center gap-1 mb-4">
+            <div className="flex items-center gap-0.5 lg:gap-1 mb-3 lg:mb-4 overflow-x-auto">
               {PHASE_STEPS.map((step, i) => {
                 const isActive = step === panelStatus.phase;
                 const isCompleted = panelCurrentStep > i;
                 const isFailed = panelStatus.phase === 'error' && panelCurrentStep === i;
 
                 return (
-                  <div key={step} className="flex items-center gap-1 flex-1">
-                    <div className="flex flex-col items-center flex-1">
+                  <div key={step} className="flex items-center gap-0.5 lg:gap-1 flex-1 min-w-0">
+                    <div className="flex flex-col items-center flex-1 min-w-0">
                       <div
                         className={cn(
-                          'w-8 h-8 rounded-full flex items-center justify-center text-xs border-2 transition-colors',
+                          'w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-xs border-2 transition-colors shrink-0',
                           isCompleted && 'bg-success/15 border-success text-success',
                           isActive && !isFailed && 'bg-accent/15 border-accent text-accent',
                           isFailed && 'bg-danger/15 border-danger text-danger',
@@ -275,19 +276,19 @@ export function UpdatePage() {
                         )}
                       >
                         {isCompleted ? (
-                          <CheckCircle2 size={16} />
+                          <CheckCircle2 size={14} className="lg:w-4 lg:h-4" />
                         ) : isActive && !isFailed ? (
-                          <Loader2 size={16} className="animate-spin" />
+                          <Loader2 size={14} className="lg:w-4 lg:h-4 animate-spin" />
                         ) : isFailed ? (
-                          <XCircle size={16} />
+                          <XCircle size={14} className="lg:w-4 lg:h-4" />
                         ) : (
                           i + 1
                         )}
                       </div>
-                      <span className="text-[10px] text-text-secondary mt-1 capitalize">{step}</span>
+                      <span className="text-[9px] lg:text-[10px] text-text-secondary mt-1 capitalize truncate max-w-full text-center px-1">{step}</span>
                     </div>
                     {i < PHASE_STEPS.length - 1 && (
-                      <ArrowRight size={12} className="text-border mb-4 shrink-0" />
+                      <ArrowRight size={10} className="lg:w-3 lg:h-3 text-border mb-4 shrink-0" />
                     )}
                   </div>
                 );
@@ -310,8 +311,8 @@ export function UpdatePage() {
 
             {/* Done */}
             {panelStatus.phase === 'done' && (
-              <div className="flex items-center gap-2 text-sm text-success mt-2">
-                <CheckCircle2 size={16} />
+              <div className="flex items-center gap-2 text-xs lg:text-sm text-success mt-2">
+                <CheckCircle2 size={14} className="lg:w-4 lg:h-4" />
                 {panelStatus.message}
               </div>
             )}
@@ -322,7 +323,7 @@ export function UpdatePage() {
                 <summary className="text-xs text-text-secondary cursor-pointer hover:text-text-primary">
                   Log ({panelStatus.log.length} entries)
                 </summary>
-                <div className="mt-2 max-h-48 overflow-y-auto bg-background rounded p-2 font-mono text-[11px] text-text-secondary space-y-0.5">
+                <div className="mt-2 max-h-48 overflow-y-auto bg-background rounded p-2 font-mono text-[10px] lg:text-[11px] text-text-secondary space-y-0.5">
                   {panelStatus.log.map((line, i) => (
                     <div key={i}>{line}</div>
                   ))}
@@ -335,35 +336,36 @@ export function UpdatePage() {
         {/* Telemt Update Section */}
         {error && <ErrorAlert message={error} />}
 
-        <div className="bg-surface rounded-lg p-5 border border-border">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-text-primary">Telemt Version</h2>
+        <div className="bg-surface rounded-lg p-4 lg:p-5 border border-border">
+          <div className="flex items-center justify-between mb-3 lg:mb-4">
+            <h2 className="text-xs lg:text-sm font-semibold text-text-primary">Telemt Version</h2>
             <button
               onClick={handleCheck}
               disabled={checking || !!isUpdating}
               className={cn(
-                'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                'flex items-center gap-1.5 lg:gap-2 px-2.5 lg:px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
                 'bg-accent/15 text-accent hover:bg-accent/25',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
-              <RefreshCw size={14} className={cn(checking && 'animate-spin')} />
-              Check for updates
+              <RefreshCw size={12} className={cn('lg:w-3.5 lg:h-3.5', checking && 'animate-spin')} />
+              <span className="hidden sm:inline">Check for updates</span>
+              <span className="sm:hidden">Check</span>
             </button>
           </div>
 
           {checkResult ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-3 lg:space-y-4">
+              <div className="grid grid-cols-2 gap-2 lg:gap-3">
                 <MetricCard label="Current Version" value={checkResult.current_version} />
                 <MetricCard label="Latest Version" value={checkResult.latest_version} />
               </div>
 
               {checkResult.update_available ? (
-                <div className="bg-accent/10 border border-accent/30 rounded-md p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-accent">
+                <div className="bg-accent/10 border border-accent/30 rounded-md p-3 lg:p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs lg:text-sm font-medium text-accent">
                         Update available: {checkResult.release_name}
                       </p>
                       <p className="text-xs text-text-secondary mt-1">
@@ -383,12 +385,12 @@ export function UpdatePage() {
                       onClick={handleApply}
                       disabled={!!isUpdating}
                       className={cn(
-                        'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
+                        'flex items-center justify-center gap-2 px-3 lg:px-4 py-2 rounded-md text-xs lg:text-sm font-medium transition-colors w-full sm:w-auto',
                         'bg-accent text-white hover:bg-accent/90',
                         'disabled:opacity-50 disabled:cursor-not-allowed'
                       )}
                     >
-                      <Download size={16} />
+                      <Download size={14} className="lg:w-4 lg:h-4" />
                       Update
                     </button>
                   </div>
@@ -398,21 +400,21 @@ export function UpdatePage() {
                       <summary className="text-xs text-text-secondary cursor-pointer hover:text-text-primary">
                         Changelog
                       </summary>
-                      <pre className="mt-2 text-xs text-text-secondary whitespace-pre-wrap bg-background rounded p-3 max-h-48 overflow-y-auto">
+                      <pre className="mt-2 text-xs text-text-secondary whitespace-pre-wrap bg-background rounded p-2 lg:p-3 max-h-48 overflow-y-auto">
                         {checkResult.changelog}
                       </pre>
                     </details>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-sm text-success">
-                  <CheckCircle2 size={16} />
+                <div className="flex items-center gap-2 text-xs lg:text-sm text-success">
+                  <CheckCircle2 size={14} className="lg:w-4 lg:h-4" />
                   You are running the latest version
                 </div>
               )}
             </div>
           ) : (
-            <p className="text-sm text-text-secondary">
+            <p className="text-xs lg:text-sm text-text-secondary">
               Click "Check for updates" to see if a new version is available.
             </p>
           )}
@@ -420,22 +422,22 @@ export function UpdatePage() {
 
         {/* Update Progress */}
         {status && status.phase !== 'idle' && (
-          <div className="bg-surface rounded-lg p-5 border border-border">
-            <h2 className="text-sm font-semibold text-text-primary mb-4">Update Progress</h2>
+          <div className="bg-surface rounded-lg p-4 lg:p-5 border border-border">
+            <h2 className="text-xs lg:text-sm font-semibold text-text-primary mb-3 lg:mb-4">Telemt Update Progress</h2>
 
             {/* Step indicators */}
-            <div className="flex items-center gap-1 mb-4">
+            <div className="flex items-center gap-0.5 lg:gap-1 mb-3 lg:mb-4 overflow-x-auto">
               {PHASE_STEPS.map((step, i) => {
                 const isActive = step === status.phase;
                 const isCompleted = currentStep > i;
                 const isFailed = status.phase === 'error' && currentStep === i;
 
                 return (
-                  <div key={step} className="flex items-center gap-1 flex-1">
-                    <div className="flex flex-col items-center flex-1">
+                  <div key={step} className="flex items-center gap-0.5 lg:gap-1 flex-1 min-w-0">
+                    <div className="flex flex-col items-center flex-1 min-w-0">
                       <div
                         className={cn(
-                          'w-8 h-8 rounded-full flex items-center justify-center text-xs border-2 transition-colors',
+                          'w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-xs border-2 transition-colors shrink-0',
                           isCompleted && 'bg-success/15 border-success text-success',
                           isActive && !isFailed && 'bg-accent/15 border-accent text-accent',
                           isFailed && 'bg-danger/15 border-danger text-danger',
@@ -443,19 +445,19 @@ export function UpdatePage() {
                         )}
                       >
                         {isCompleted ? (
-                          <CheckCircle2 size={16} />
+                          <CheckCircle2 size={14} className="lg:w-4 lg:h-4" />
                         ) : isActive && !isFailed ? (
-                          <Loader2 size={16} className="animate-spin" />
+                          <Loader2 size={14} className="lg:w-4 lg:h-4 animate-spin" />
                         ) : isFailed ? (
-                          <XCircle size={16} />
+                          <XCircle size={14} className="lg:w-4 lg:h-4" />
                         ) : (
                           i + 1
                         )}
                       </div>
-                      <span className="text-[10px] text-text-secondary mt-1 capitalize">{step}</span>
+                      <span className="text-[9px] lg:text-[10px] text-text-secondary mt-1 capitalize truncate max-w-full text-center px-1">{step}</span>
                     </div>
                     {i < PHASE_STEPS.length - 1 && (
-                      <ArrowRight size={12} className="text-border mb-4 shrink-0" />
+                      <ArrowRight size={10} className="lg:w-3 lg:h-3 text-border mb-4 shrink-0" />
                     )}
                   </div>
                 );
@@ -478,8 +480,8 @@ export function UpdatePage() {
 
             {/* Done */}
             {status.phase === 'done' && (
-              <div className="flex items-center gap-2 text-sm text-success mt-2">
-                <CheckCircle2 size={16} />
+              <div className="flex items-center gap-2 text-xs lg:text-sm text-success mt-2">
+                <CheckCircle2 size={14} className="lg:w-4 lg:h-4" />
                 {status.message}
               </div>
             )}
@@ -490,7 +492,7 @@ export function UpdatePage() {
                 <summary className="text-xs text-text-secondary cursor-pointer hover:text-text-primary">
                   Log ({status.log.length} entries)
                 </summary>
-                <div className="mt-2 max-h-48 overflow-y-auto bg-background rounded p-2 font-mono text-[11px] text-text-secondary space-y-0.5">
+                <div className="mt-2 max-h-48 overflow-y-auto bg-background rounded p-2 font-mono text-[10px] lg:text-[11px] text-text-secondary space-y-0.5">
                   {status.log.map((line, i) => (
                     <div key={i}>{line}</div>
                   ))}

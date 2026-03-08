@@ -129,112 +129,201 @@ export function UsersPage() {
   }, [deleteUser, refresh]);
 
   return (
-    <div>
+    <div className="min-h-screen">
       <Header title="Users" refreshing={loading} onRefresh={refresh} />
 
-      <div className="p-6 space-y-4">
+      <div className="p-4 lg:p-6 space-y-4">
         {error && <ErrorAlert message={error.message} onRetry={refresh} />}
         {actionError && <ErrorAlert message={actionError} />}
 
         <div className="flex justify-end">
           <Button onClick={() => setCreateOpen(true)}>
             <Plus size={16} className="mr-1.5" />
-            Create User
+            <span className="hidden sm:inline">Create User</span>
+            <span className="sm:hidden">Create</span>
           </Button>
         </div>
 
-        <div className="border border-border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>Proxy Links</TableHead>
-                <TableHead>Connections</TableHead>
-                <TableHead>Active IPs</TableHead>
-                <TableHead>Traffic</TableHead>
-                <TableHead>Quota</TableHead>
-                <TableHead>Expiration</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(!users || users.length === 0) ? (
+        {/* Desktop Table */}
+        <div className="hidden lg:block border border-border rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-text-secondary py-8">
-                    No users configured
-                  </TableCell>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Proxy Links</TableHead>
+                  <TableHead>Connections</TableHead>
+                  <TableHead>Active IPs</TableHead>
+                  <TableHead>Traffic</TableHead>
+                  <TableHead>Quota</TableHead>
+                  <TableHead>Expiration</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                users.map((u) => {
-                  const allLinks = collectLinks(u.links);
+              </TableHeader>
+              <TableBody>
+                {(!users || users.length === 0) ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-text-secondary py-8">
+                      No users configured
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  users.map((u) => {
+                    const allLinks = collectLinks(u.links);
 
-                  return (
-                    <TableRow key={u.username}>
-                      <TableCell className="font-medium">{u.username}</TableCell>
-                      <TableCell>
-                        {allLinks.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            {allLinks.map((link, i) => (
-                              <div key={i} className="flex items-center gap-1">
-                                <CopyButton text={link.url} label={link.label} />
-                                <CopyButton text={link.url.replace('tg://proxy', 'https://t.me/proxy')} label="t.me" />
-                              </div>
-                            ))}
+                    return (
+                      <TableRow key={u.username}>
+                        <TableCell className="font-medium">{u.username}</TableCell>
+                        <TableCell>
+                          {allLinks.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {allLinks.map((link, i) => (
+                                <div key={i} className="flex items-center gap-1">
+                                  <CopyButton text={link.url} label={link.label} />
+                                  <CopyButton text={link.url.replace('tg://proxy', 'https://t.me/proxy')} label="t.me" />
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-text-secondary text-xs">No links</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={u.current_connections > 0 ? 'default' : 'outline'}>
+                            {u.current_connections}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{u.active_unique_ips}</span>
+                          {u.max_unique_ips && (
+                            <span className="text-xs text-text-secondary ml-1">/ {u.max_unique_ips}</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{formatBytes(u.total_octets)}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {u.data_quota_bytes ? (
+                            <Badge variant="outline">{formatBytes(u.data_quota_bytes)}</Badge>
+                          ) : (
+                            <span className="text-text-secondary">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {u.expiration_rfc3339 ? (
+                            <span className="text-xs">{new Date(u.expiration_rfc3339).toLocaleDateString()}</span>
+                          ) : (
+                            <span className="text-text-secondary">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              onClick={() => setEditUser(u)}
+                              className="p-1.5 rounded text-text-secondary hover:text-accent hover:bg-surface-hover"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              onClick={() => setDeleteUser(u.username)}
+                              className="p-1.5 rounded text-text-secondary hover:text-danger hover:bg-surface-hover"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
-                        ) : (
-                          <span className="text-text-secondary text-xs">No links</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={u.current_connections > 0 ? 'default' : 'outline'}>
-                          {u.current_connections}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">{u.active_unique_ips}</span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="lg:hidden space-y-3">
+          {(!users || users.length === 0) ? (
+            <div className="text-center text-text-secondary py-8 bg-surface border border-border rounded-lg">
+              No users configured
+            </div>
+          ) : (
+            users.map((u) => {
+              const allLinks = collectLinks(u.links);
+
+              return (
+                <div key={u.username} className="bg-surface border border-border rounded-lg p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-text-primary">{u.username}</h3>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setEditUser(u)}
+                        className="p-1.5 rounded text-text-secondary hover:text-accent hover:bg-surface-hover"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteUser(u.username)}
+                        className="p-1.5 rounded text-text-secondary hover:text-danger hover:bg-surface-hover"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {allLinks.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="text-xs text-text-secondary">Proxy Links</div>
+                      {allLinks.map((link, i) => (
+                        <div key={i} className="flex items-center gap-1">
+                          <CopyButton text={link.url} label={link.label} />
+                          <CopyButton text={link.url.replace('tg://proxy', 'https://t.me/proxy')} label="t.me" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <div className="text-text-secondary">Connections</div>
+                      <Badge variant={u.current_connections > 0 ? 'default' : 'outline'} className="mt-1">
+                        {u.current_connections}
+                      </Badge>
+                    </div>
+                    <div>
+                      <div className="text-text-secondary">Active IPs</div>
+                      <div className="mt-1">
+                        {u.active_unique_ips}
                         {u.max_unique_ips && (
-                          <span className="text-xs text-text-secondary ml-1">/ {u.max_unique_ips}</span>
+                          <span className="text-text-secondary ml-1">/ {u.max_unique_ips}</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{formatBytes(u.total_octets)}</Badge>
-                      </TableCell>
-                      <TableCell>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-text-secondary">Traffic</div>
+                      <Badge variant="outline" className="mt-1">{formatBytes(u.total_octets)}</Badge>
+                    </div>
+                    <div>
+                      <div className="text-text-secondary">Quota</div>
+                      <div className="mt-1">
                         {u.data_quota_bytes ? (
                           <Badge variant="outline">{formatBytes(u.data_quota_bytes)}</Badge>
                         ) : (
                           <span className="text-text-secondary">-</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        {u.expiration_rfc3339 ? (
-                          <span className="text-xs">{new Date(u.expiration_rfc3339).toLocaleDateString()}</span>
-                        ) : (
-                          <span className="text-text-secondary">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <button
-                            onClick={() => setEditUser(u)}
-                            className="p-1.5 rounded text-text-secondary hover:text-accent hover:bg-surface-hover"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            onClick={() => setDeleteUser(u.username)}
-                            className="p-1.5 rounded text-text-secondary hover:text-danger hover:bg-surface-hover"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                      </div>
+                    </div>
+                    {u.expiration_rfc3339 && (
+                      <div className="col-span-2">
+                        <div className="text-text-secondary">Expiration</div>
+                        <div className="mt-1">{new Date(u.expiration_rfc3339).toLocaleDateString()}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

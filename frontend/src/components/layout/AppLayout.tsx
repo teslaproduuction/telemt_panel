@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
+import { Sidebar, BottomNav } from './Sidebar';
 import { useAuth } from '@/hooks/useAuth';
+import { Menu } from 'lucide-react';
 
 export function AppLayout() {
   const { username, loading } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (loading) {
     return (
@@ -19,10 +22,26 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 ml-60">
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <main className="flex-1 lg:ml-60 pb-16 lg:pb-0">
+        {/* Mobile header with hamburger */}
+        <div className="lg:hidden sticky top-0 z-20 bg-surface border-b border-border px-4 py-3 flex items-center gap-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 hover:bg-surface-hover rounded-md"
+          >
+            <Menu size={20} />
+          </button>
+          <h1 className="text-sm font-semibold text-text-primary">
+            Telemt Panel
+          </h1>
+        </div>
+
         <Outlet />
       </main>
+
+      <BottomNav />
     </div>
   );
 }
