@@ -33,7 +33,9 @@ jobs:
 
       - name: Build binaries
         run: |
+          # Remove 'v' prefix from tag (v0.2.0 -> 0.2.0)
           VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
 
           # Build for x86_64
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \

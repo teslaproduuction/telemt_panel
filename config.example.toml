@@ -20,8 +20,8 @@ auth_header = "your-telemt-api-secret"
 # binary_path = "/usr/local/bin/telemt-panel"
 # Systemd service name (default: telemt-panel)
 # service_name = "telemt-panel"
-# GitHub repository for update checks (default: telemt/telemt-panel)
-# github_repo = "telemt/telemt-panel"
+# GitHub repository for update checks (default: amirotin/telemt_panel)
+# github_repo = "amirotin/telemt_panel"
 
 [tls]
 # Option 1: Custom certificates

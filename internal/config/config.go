@@ -80,7 +80,7 @@ func Load(path string) (*Config, error) {
 		cfg.Panel.ServiceName = "telemt-panel"
 	}
 	if cfg.Panel.GithubRepo == "" {
-		cfg.Panel.GithubRepo = "telemt/telemt-panel"
+		cfg.Panel.GithubRepo = "amirotin/telemt_panel"
 	}
 
 	if cfg.TLS.AcmeCacheDir == "" {
