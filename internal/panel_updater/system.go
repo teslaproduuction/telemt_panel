@@ -91,8 +91,8 @@ func ExtractBinary(tarGzPath, destPath string) error {
 			continue
 		}
 
-		dir := filepath.Dir(destPath)
-		tmp, err := os.CreateTemp(dir, ".panel-update-*")
+		// Create temp file in /tmp instead of destination directory
+		tmp, err := os.CreateTemp("/tmp", ".panel-update-*")
 		if err != nil {
 			return err
 		}
