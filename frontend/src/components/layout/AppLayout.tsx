@@ -24,7 +24,7 @@ export function AppLayout() {
     <div className="flex min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <main className="flex-1 lg:ml-60 pb-16 lg:pb-0">
+      <main className="flex-1 min-w-0 overflow-x-hidden lg:ml-60 pb-16 lg:pb-0">
         {/* Mobile header with hamburger */}
         <div className="lg:hidden sticky top-0 z-20 bg-surface border-b border-border px-4 py-3 flex items-center gap-3">
           <button

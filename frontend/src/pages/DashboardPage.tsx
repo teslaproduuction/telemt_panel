@@ -1,9 +1,7 @@
-import { useMemo } from 'react';
 import { Header } from '@/components/layout/Header';
 import { MetricCard } from '@/components/MetricCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { DataTable } from '@/components/DataTable';
 import { StartupStatus } from '@/components/StartupStatus';
 import { useWsSubscription, useEndpoint } from '@/hooks/useWebSocket';
 import { formatUptime, formatNumber } from '@/lib/utils';
@@ -26,17 +24,6 @@ interface SystemInfoData {
   [key: string]: unknown;
 }
 
-interface DcStatus {
-  dc_id: number;
-  [key: string]: unknown;
-}
-
-interface DcStatusData {
-  middle_proxy_enabled: boolean;
-  reason?: string;
-  dcs: DcStatus[];
-}
-
 interface GatesData {
   startup_status?: string;
   startup_stage?: string;
@@ -44,7 +31,7 @@ interface GatesData {
   [key: string]: unknown;
 }
 
-const ENDPOINTS = ['/v1/health', '/v1/stats/summary', '/v1/system/info', '/v1/stats/dcs', '/v1/runtime/gates'];
+const ENDPOINTS = ['/v1/health', '/v1/stats/summary', '/v1/system/info', '/v1/runtime/gates'];
 
 export function DashboardPage() {
   const { data: wsData, errors, connected, refresh } = useWsSubscription('dashboard', ENDPOINTS, 5);
@@ -52,26 +39,10 @@ export function DashboardPage() {
   const health = useEndpoint<HealthData>(wsData, '/v1/health');
   const summary = useEndpoint<SummaryData>(wsData, '/v1/stats/summary');
   const system = useEndpoint<SystemInfoData>(wsData, '/v1/system/info');
-  const dcs = useEndpoint<DcStatusData>(wsData, '/v1/stats/dcs');
   const gates = useEndpoint<GatesData>(wsData, '/v1/runtime/gates');
 
   const isHealthy = health?.status === 'ok';
   const firstError = Object.values(errors)[0];
-
-  const dcColumns = useMemo(() => [
-    { key: 'dc_id', header: 'DC ID' },
-    ...Object.keys(dcs?.dcs?.[0] ?? {})
-      .filter((k) => k !== 'dc_id')
-      .map((k) => ({
-        key: k,
-        header: k.replace(/_/g, ' '),
-        render: (row: DcStatus) => {
-          const v = row[k];
-          if (typeof v === 'boolean') return <StatusBadge status={v} />;
-          return String(v ?? '-');
-        },
-      })),
-  ], [dcs]);
 
   return (
     <div>
@@ -165,18 +136,6 @@ export function DashboardPage() {
           </div>
         )}
 
-        {/* DC Status */}
-        {dcs?.dcs && dcs.dcs.length > 0 && (
-          <div>
-            <h3 className="text-xs lg:text-sm font-medium text-text-secondary mb-2 lg:mb-3">DC Status</h3>
-            <DataTable
-              columns={dcColumns}
-              data={dcs.dcs}
-              keyField="dc_id"
-              emptyMessage="No DCs available"
-            />
-          </div>
-        )}
       </div>
     </div>
   );

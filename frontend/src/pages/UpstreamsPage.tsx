@@ -38,6 +38,20 @@ interface MeWritersData {
   [key: string]: unknown;
 }
 
+function formatValue(value: unknown): string {
+  if (value == null) return '-';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(formatValue).join(', ');
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([k, v]) => `${k}: ${formatValue(v)}`)
+      .join(', ');
+  }
+  return String(value);
+}
+
 const ENDPOINTS = ['/v1/stats/upstreams', '/v1/stats/dcs', '/v1/stats/me-writers'];
 
 export function UpstreamsPage() {
@@ -91,7 +105,7 @@ export function UpstreamsPage() {
                           <div key={key}>
                             <span className="text-text-secondary">{key.replace(/_/g, ' ')}: </span>
                             <span className="text-text-primary">
-                              {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value ?? '-')}
+                              {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : formatValue(value)}
                             </span>
                           </div>
                         ))}
@@ -116,15 +130,29 @@ export function UpstreamsPage() {
                     {Object.entries(dc)
                       .filter(([k]) => k !== 'dc_id')
                       .map(([key, value]) => (
-                        <div key={key}>
+                        <div key={key} className={Array.isArray(value) || (typeof value === 'object' && value !== null && typeof value !== 'boolean') ? 'col-span-2' : ''}>
                           <span className="text-text-secondary">{key.replace(/_/g, ' ')}: </span>
-                          <span className="text-text-primary">
-                            {typeof value === 'boolean' ? (
-                              <StatusBadge status={value} />
-                            ) : (
-                              String(value ?? '-')
-                            )}
-                          </span>
+                          {typeof value === 'boolean' ? (
+                            <StatusBadge status={value} />
+                          ) : Array.isArray(value) ? (
+                            <div className="mt-1 space-y-0.5">
+                              {value.map((item, i) => (
+                                <div key={i} className="text-text-primary font-mono text-xs break-all">
+                                  {formatValue(item)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : typeof value === 'object' && value !== null ? (
+                            <div className="mt-1 space-y-0.5">
+                              {Object.entries(value as Record<string, unknown>).map(([k, v]) => (
+                                <div key={k} className="text-text-primary text-xs break-all">
+                                  <span className="text-text-secondary">{k}: </span>{formatValue(v)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-text-primary">{formatValue(value)}</span>
+                          )}
                         </div>
                       ))}
                   </div>
