@@ -4,6 +4,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { DataTable } from '@/components/DataTable';
+import { StartupStatus } from '@/components/StartupStatus';
 import { useWsSubscription, useEndpoint } from '@/hooks/useWebSocket';
 import { formatUptime, formatNumber } from '@/lib/utils';
 import { Activity, Wifi, WifiOff, Clock, Users } from 'lucide-react';
@@ -36,7 +37,14 @@ interface DcStatusData {
   dcs: DcStatus[];
 }
 
-const ENDPOINTS = ['/v1/health', '/v1/stats/summary', '/v1/system/info', '/v1/stats/dcs'];
+interface GatesData {
+  startup_status?: string;
+  startup_stage?: string;
+  startup_progress_pct?: number;
+  [key: string]: unknown;
+}
+
+const ENDPOINTS = ['/v1/health', '/v1/stats/summary', '/v1/system/info', '/v1/stats/dcs', '/v1/runtime/gates'];
 
 export function DashboardPage() {
   const { data: wsData, errors, connected, refresh } = useWsSubscription('dashboard', ENDPOINTS, 5);
@@ -45,6 +53,7 @@ export function DashboardPage() {
   const summary = useEndpoint<SummaryData>(wsData, '/v1/stats/summary');
   const system = useEndpoint<SystemInfoData>(wsData, '/v1/system/info');
   const dcs = useEndpoint<DcStatusData>(wsData, '/v1/stats/dcs');
+  const gates = useEndpoint<GatesData>(wsData, '/v1/runtime/gates');
 
   const isHealthy = health?.status === 'ok';
   const firstError = Object.values(errors)[0];
@@ -98,6 +107,15 @@ export function DashboardPage() {
             </span>
           )}
         </div>
+
+        {/* Startup Status */}
+        {gates && (
+          <StartupStatus
+            status={gates.startup_status}
+            stage={gates.startup_stage}
+            progressPct={gates.startup_progress_pct}
+          />
+        )}
 
         {/* Metric Cards */}
         {summary && (

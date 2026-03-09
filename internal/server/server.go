@@ -237,6 +237,15 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: panelUpd.GetStatus()})
 	})))
 
+	// Telemt service restart endpoint
+	mux.Handle("POST /api/telemt/restart", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := updater.RestartService(s.cfg.Telemt.ServiceName); err != nil {
+			writeError(w, http.StatusInternalServerError, "restart_failed", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: map[string]string{"status": "restarting"}})
+	})))
+
 	// Telemt API proxy (kept for direct REST calls like user CRUD)
 	mux.Handle("/api/telemt/", auth.RequireAuth(jwtSecret, telemtProxy))
 

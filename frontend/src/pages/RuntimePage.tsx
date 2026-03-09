@@ -208,6 +208,13 @@ export function RuntimePage() {
 
   const firstError = Object.values(errors)[0];
 
+  // Filter out startup fields from gates (they're shown on Dashboard)
+  const filteredGates = gates ? Object.fromEntries(
+    Object.entries(gates).filter(([key]) =>
+      !key.startsWith('startup_')
+    )
+  ) : null;
+
   return (
     <div>
       <Header title="Runtime" refreshing={!connected} onRefresh={refresh} />
@@ -216,9 +223,9 @@ export function RuntimePage() {
         {firstError && <ErrorAlert message={firstError} onRetry={refresh} />}
 
         {/* Gates */}
-        {gates && (
+        {filteredGates && Object.keys(filteredGates).length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {Object.entries(gates).map(([key, value]) => (
+            {Object.entries(filteredGates).map(([key, value]) => (
               <div key={key} className="bg-surface border border-border rounded-lg p-3 flex flex-col items-center gap-2">
                 <span className="text-xs text-text-secondary text-center leading-tight">{key.replace(/_/g, ' ')}</span>
                 {typeof value === 'boolean' ? (
