@@ -41,7 +41,7 @@ interface MeWritersData {
 function formatValue(value: unknown): string {
   if (value == null) return '-';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'number') return String(value);
+  if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(1);
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.map(formatValue).join(', ');
   if (typeof value === 'object') {
