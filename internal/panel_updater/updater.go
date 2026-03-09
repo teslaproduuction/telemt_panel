@@ -1,6 +1,7 @@
 package panel_updater
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -48,14 +49,56 @@ type Updater struct {
 	githubRepo     string
 }
 
+const statusFilePath = "/tmp/telemt-panel-update-status.json"
+
+func (u *Updater) saveStatusToFile(s Status) {
+	data, err := json.Marshal(s)
+	if err != nil {
+		log.Printf("[panel_updater] failed to marshal status: %s", err)
+		return
+	}
+	if err := os.WriteFile(statusFilePath, data, 0644); err != nil {
+		log.Printf("[panel_updater] failed to write status file: %s", err)
+	}
+}
+
+func (u *Updater) loadStatusFromFile() {
+	data, err := os.ReadFile(statusFilePath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Printf("[panel_updater] failed to read status file: %s", err)
+		}
+		return
+	}
+	var s Status
+	if err := json.Unmarshal(data, &s); err != nil {
+		log.Printf("[panel_updater] failed to unmarshal status: %s", err)
+		return
+	}
+	u.mu.Lock()
+	u.status = s
+	u.mu.Unlock()
+	log.Printf("[panel_updater] loaded status from file: phase=%s", s.Phase)
+
+	// Clean up status file after loading
+	os.Remove(statusFilePath)
+}
+
 func New(currentVersion, binaryPath, serviceName, githubRepo string) *Updater {
-	return &Updater{
+	u := &Updater{
 		status:         Status{Phase: PhaseIdle},
 		currentVersion: currentVersion,
 		binaryPath:     binaryPath,
 		serviceName:    serviceName,
 		githubRepo:     githubRepo,
 	}
+	// Try to load status from previous session (in case of restart during update)
+	u.loadStatusFromFile()
+
+	// Clean up any leftover backup from previous update
+	RemoveBackup(binaryPath)
+
+	return u
 }
 
 func (u *Updater) GetStatus() Status {
@@ -165,11 +208,11 @@ func (u *Updater) applyAsync() {
 		u.setError(fmt.Errorf("download checksum: %w", err))
 		return
 	}
-	defer os.Remove(shaPath)
 	u.appendLog(fmt.Sprintf("sha256 saved to %s", shaPath))
 
 	shaBytes, err := os.ReadFile(shaPath)
 	if err != nil {
+		os.Remove(shaPath)
 		u.setError(fmt.Errorf("read checksum: %w", err))
 		return
 	}
@@ -180,10 +223,10 @@ func (u *Updater) applyAsync() {
 	u.appendLog(fmt.Sprintf("downloading tarball from %s", tarAsset.BrowserDownloadURL))
 	tarPath, err := DownloadFile(tarAsset.BrowserDownloadURL)
 	if err != nil {
+		os.Remove(shaPath)
 		u.setError(fmt.Errorf("download tarball: %w", err))
 		return
 	}
-	defer os.Remove(tarPath)
 
 	tarInfo, _ := os.Stat(tarPath)
 	if tarInfo != nil {
@@ -193,6 +236,8 @@ func (u *Updater) applyAsync() {
 	// Verify sha256
 	u.setStatus(PhaseVerifying, "verifying sha256 checksum")
 	if err := VerifySha256(tarPath, string(shaBytes)); err != nil {
+		os.Remove(tarPath)
+		os.Remove(shaPath)
 		u.setError(fmt.Errorf("checksum verification: %w", err))
 		return
 	}
@@ -201,6 +246,8 @@ func (u *Updater) applyAsync() {
 	// Backup current binary
 	u.setStatus(PhaseReplacing, fmt.Sprintf("backing up %s to /tmp", u.binaryPath))
 	if err := BackupBinary(u.binaryPath); err != nil {
+		os.Remove(tarPath)
+		os.Remove(shaPath)
 		u.setError(fmt.Errorf("backup %s: %w", u.binaryPath, err))
 		return
 	}
@@ -209,13 +256,38 @@ func (u *Updater) applyAsync() {
 	// Extract new binary
 	u.setStatus(PhaseReplacing, fmt.Sprintf("extracting to %s", u.binaryPath))
 	if err := ExtractBinary(tarPath, u.binaryPath); err != nil {
+		os.Remove(tarPath)
+		os.Remove(shaPath)
 		u.setError(fmt.Errorf("extract to %s: %w", u.binaryPath, err))
 		return
 	}
 
+	// Clean up downloads after extraction
+	os.Remove(tarPath)
+	os.Remove(shaPath)
+
 	newInfo, _ := os.Stat(u.binaryPath)
 	if newInfo != nil {
 		u.appendLog(fmt.Sprintf("new binary written: %s (%d bytes, mode %s)", u.binaryPath, newInfo.Size(), newInfo.Mode()))
+	}
+
+	u.appendLog(fmt.Sprintf("updated to %s", release.TagName))
+
+	// Save final status to file BEFORE restart (so it survives the restart)
+	u.mu.Lock()
+	finalStatus := Status{
+		Phase:   PhaseDone,
+		Message: fmt.Sprintf("updated to %s", strings.TrimPrefix(release.TagName, "v")),
+		Log:     u.status.Log,
+	}
+	u.mu.Unlock()
+	u.saveStatusToFile(finalStatus)
+
+	// Remove backup BEFORE restart (code after restart won't execute)
+	if err := RemoveBackup(u.binaryPath); err != nil {
+		u.appendLog(fmt.Sprintf("warning: failed to remove backup: %s", err))
+	} else {
+		u.appendLog("backup removed")
 	}
 
 	// Restart service
@@ -228,18 +300,11 @@ func (u *Updater) applyAsync() {
 		}
 		u.appendLog("rollback complete, restarting with old binary")
 		RestartService(u.serviceName)
+		RemoveBackup(u.binaryPath) // Clean up backup after rollback
 		u.setError(fmt.Errorf("restart failed, rolled back: %w", err))
 		return
 	}
 	u.appendLog("systemctl restart succeeded")
 
-	// Remove backup after successful update
-	if err := RemoveBackup(u.binaryPath); err != nil {
-		u.appendLog(fmt.Sprintf("warning: failed to remove backup: %s", err))
-	} else {
-		u.appendLog("backup removed")
-	}
-
-	u.appendLog(fmt.Sprintf("updated to %s", release.TagName))
 	u.setStatus(PhaseDone, fmt.Sprintf("updated to %s", strings.TrimPrefix(release.TagName, "v")))
 }

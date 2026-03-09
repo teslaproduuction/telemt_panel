@@ -237,11 +237,11 @@ func (u *Updater) applyAsync() {
 		u.setError(fmt.Errorf("download checksum: %w", err))
 		return
 	}
-	defer os.Remove(shaPath)
 	u.appendLog(fmt.Sprintf("sha256 saved to %s", shaPath))
 
 	shaBytes, err := os.ReadFile(shaPath)
 	if err != nil {
+		os.Remove(shaPath)
 		u.setError(fmt.Errorf("read checksum: %w", err))
 		return
 	}
@@ -252,10 +252,10 @@ func (u *Updater) applyAsync() {
 	u.appendLog(fmt.Sprintf("downloading tarball from %s", tarAsset.BrowserDownloadURL))
 	tarPath, err := DownloadFile(tarAsset.BrowserDownloadURL)
 	if err != nil {
+		os.Remove(shaPath)
 		u.setError(fmt.Errorf("download tarball: %w", err))
 		return
 	}
-	defer os.Remove(tarPath)
 
 	tarInfo, _ := os.Stat(tarPath)
 	if tarInfo != nil {
@@ -265,6 +265,8 @@ func (u *Updater) applyAsync() {
 	// Verify sha256
 	u.setStatus(PhaseVerifying, "verifying sha256 checksum")
 	if err := VerifySha256(tarPath, string(shaBytes)); err != nil {
+		os.Remove(tarPath)
+		os.Remove(shaPath)
 		u.setError(fmt.Errorf("checksum verification: %w", err))
 		return
 	}
@@ -273,6 +275,8 @@ func (u *Updater) applyAsync() {
 	// Backup current binary
 	u.setStatus(PhaseReplacing, fmt.Sprintf("backing up %s to /tmp", u.binaryPath))
 	if err := BackupBinary(u.binaryPath); err != nil {
+		os.Remove(tarPath)
+		os.Remove(shaPath)
 		u.setError(fmt.Errorf("backup %s: %w", u.binaryPath, err))
 		return
 	}
@@ -281,9 +285,15 @@ func (u *Updater) applyAsync() {
 	// Extract new binary
 	u.setStatus(PhaseReplacing, fmt.Sprintf("extracting to %s", u.binaryPath))
 	if err := ExtractBinary(tarPath, u.binaryPath); err != nil {
+		os.Remove(tarPath)
+		os.Remove(shaPath)
 		u.setError(fmt.Errorf("extract to %s: %w", u.binaryPath, err))
 		return
 	}
+
+	// Clean up downloads after extraction
+	os.Remove(tarPath)
+	os.Remove(shaPath)
 
 	newInfo, _ := os.Stat(u.binaryPath)
 	if newInfo != nil {
@@ -300,6 +310,7 @@ func (u *Updater) applyAsync() {
 		}
 		u.appendLog("rollback complete, restarting with old binary")
 		RestartService(u.serviceName)
+		RemoveBackup(u.binaryPath) // Clean up backup after rollback
 		u.setError(fmt.Errorf("restart failed, rolled back: %w", err))
 		return
 	}
@@ -317,6 +328,7 @@ func (u *Updater) applyAsync() {
 		}
 		u.appendLog("rollback complete, restarting with old binary")
 		RestartService(u.serviceName)
+		RemoveBackup(u.binaryPath) // Clean up backup after rollback
 		u.setError(fmt.Errorf("healthcheck failed, rolled back: %w", err))
 		return
 	}
