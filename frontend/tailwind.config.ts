@@ -9,6 +9,7 @@ export default {
         surface: '#161b22',
         'surface-hover': '#1c2333',
         border: '#2d333b',
+        primary: '#3b82f6',
         accent: '#3b82f6',
         'accent-hover': '#2563eb',
         'text-primary': '#e6edf3',

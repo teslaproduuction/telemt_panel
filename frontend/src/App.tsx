@@ -9,6 +9,7 @@ import { RuntimePage } from '@/pages/RuntimePage';
 import { SecurityPage } from '@/pages/SecurityPage';
 import { UpstreamsPage } from '@/pages/UpstreamsPage';
 import { UpdatePage } from '@/pages/UpdatePage';
+import { ConfigPage } from '@/pages/ConfigPage';
 
 function AuthenticatedApp() {
   const { username, loading } = useAuth();
@@ -35,6 +36,7 @@ function AuthenticatedApp() {
           <Route path="/runtime" element={<RuntimePage />} />
           <Route path="/security" element={<SecurityPage />} />
           <Route path="/upstreams" element={<UpstreamsPage />} />
+          <Route path="/config" element={<ConfigPage />} />
           <Route path="/update" element={<UpdatePage />} />
         </Route>
       </Routes>

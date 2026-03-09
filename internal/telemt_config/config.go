@@ -1,0 +1,170 @@
+package telemt_config
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/pelletier/go-toml/v2"
+)
+
+// ReadConfig reads Telemt config file and returns content with hash
+func ReadConfig(configPath string) (content string, hash string, err error) {
+	// Security: prevent path traversal
+	if strings.Contains(configPath, "..") {
+		return "", "", fmt.Errorf("invalid config path")
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return "", "", fmt.Errorf("read config: %w", err)
+	}
+
+	content = string(data)
+	hash = calculateHash(data)
+	return content, hash, nil
+}
+
+// SaveConfig saves Telemt config with backup
+func SaveConfig(configPath, content string) (newHash string, err error) {
+	// Security: prevent path traversal
+	if strings.Contains(configPath, "..") {
+		return "", fmt.Errorf("invalid config path")
+	}
+
+	// Validate TOML syntax
+	var testMap map[string]interface{}
+	if err := toml.Unmarshal([]byte(content), &testMap); err != nil {
+		return "", fmt.Errorf("invalid TOML syntax: %w", err)
+	}
+
+	// Create backup
+	timestamp := time.Now().Format("20060102-150405")
+	backupPath := fmt.Sprintf("%s.backup.%s", configPath, timestamp)
+	if err := createBackup(configPath, backupPath); err != nil {
+		return "", fmt.Errorf("create backup: %w", err)
+	}
+
+	// Atomic write: write to temp file, then rename
+	dir := filepath.Dir(configPath)
+	tmpFile, err := os.CreateTemp(dir, "config-*.tmp")
+	if err != nil {
+		return "", fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath) // cleanup on error
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("write temp file: %w", err)
+	}
+	tmpFile.Close()
+
+	// Atomic rename
+	if err := os.Rename(tmpPath, configPath); err != nil {
+		return "", fmt.Errorf("rename temp file: %w", err)
+	}
+
+	newHash = calculateHash([]byte(content))
+	return newHash, nil
+}
+
+// QuickUpdate updates specific fields in config
+func QuickUpdate(configPath string, updates map[string]interface{}) (newHash string, err error) {
+	// Security: prevent path traversal
+	if strings.Contains(configPath, "..") {
+		return "", fmt.Errorf("invalid config path")
+	}
+
+	// Read current config
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return "", fmt.Errorf("read config: %w", err)
+	}
+
+	// Parse to map
+	var config map[string]interface{}
+	if err := toml.Unmarshal(data, &config); err != nil {
+		return "", fmt.Errorf("parse config: %w", err)
+	}
+
+	// Apply updates (support nested keys via dot notation)
+	for key, value := range updates {
+		if value == nil {
+			// Delete key
+			deleteNestedKey(config, key)
+		} else {
+			// Set key
+			setNestedKey(config, key, value)
+		}
+	}
+
+	// Serialize back to TOML
+	newContent, err := toml.Marshal(config)
+	if err != nil {
+		return "", fmt.Errorf("marshal config: %w", err)
+	}
+
+	// Save
+	return SaveConfig(configPath, string(newContent))
+}
+
+// Helper: set nested key like "server.port" = 443
+func setNestedKey(m map[string]interface{}, key string, value interface{}) {
+	parts := strings.Split(key, ".")
+	current := m
+
+	for i := 0; i < len(parts)-1; i++ {
+		part := parts[i]
+		if _, ok := current[part]; !ok {
+			current[part] = make(map[string]interface{})
+		}
+		if nested, ok := current[part].(map[string]interface{}); ok {
+			current = nested
+		} else {
+			// Can't traverse further, create new map
+			newMap := make(map[string]interface{})
+			current[part] = newMap
+			current = newMap
+		}
+	}
+
+	current[parts[len(parts)-1]] = value
+}
+
+// Helper: delete nested key
+func deleteNestedKey(m map[string]interface{}, key string) {
+	parts := strings.Split(key, ".")
+	current := m
+
+	for i := 0; i < len(parts)-1; i++ {
+		part := parts[i]
+		if nested, ok := current[part].(map[string]interface{}); ok {
+			current = nested
+		} else {
+			return // path doesn't exist
+		}
+	}
+
+	delete(current, parts[len(parts)-1])
+}
+
+func createBackup(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // no file to backup
+		}
+		return err
+	}
+	return os.WriteFile(dst, data, 0644)
+}
+
+func calculateHash(data []byte) string {
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:])
+}

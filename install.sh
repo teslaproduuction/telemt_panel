@@ -60,15 +60,15 @@ if [ ! -f "$CONFIG_DIR/config.toml" ]; then
   echo ""
   echo "Setting up initial configuration..."
 
-  read -rp "Telemt API URL [http://127.0.0.1:2398]: " TELEMT_URL
+  read -rp "Telemt API URL [http://127.0.0.1:2398]: " TELEMT_URL < /dev/tty
   TELEMT_URL="${TELEMT_URL:-http://127.0.0.1:2398}"
 
-  read -rp "Telemt API auth header (leave empty if none): " TELEMT_AUTH
+  read -rp "Telemt API auth header (leave empty if none): " TELEMT_AUTH < /dev/tty
 
-  read -rp "Panel admin username [admin]: " ADMIN_USER
+  read -rp "Panel admin username [admin]: " ADMIN_USER < /dev/tty
   ADMIN_USER="${ADMIN_USER:-admin}"
 
-  read -rsp "Panel admin password: " ADMIN_PASS
+  read -rsp "Panel admin password: " ADMIN_PASS < /dev/tty
   echo ""
 
   PASS_HASH=$("$INSTALL_DIR/telemt-panel" hash-password <<< "$ADMIN_PASS")

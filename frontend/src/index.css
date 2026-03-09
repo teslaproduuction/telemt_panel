@@ -22,3 +22,12 @@
     @apply bg-text-secondary;
   }
 }
+
+@layer components {
+  .input {
+    @apply w-full px-3 py-2 bg-surface border border-border rounded-lg text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-colors;
+  }
+  .checkbox {
+    @apply w-4 h-4 rounded border-border bg-surface text-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 cursor-pointer;
+  }
+}

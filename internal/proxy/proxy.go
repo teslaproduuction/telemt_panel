@@ -1,13 +1,26 @@
 package proxy
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
 )
 
-func NewTelemtProxy(targetURL string, authHeader string) (http.Handler, error) {
+type TelemtProxy struct {
+	handler    http.Handler
+	targetURL  string
+	authHeader string
+}
+
+type SystemInfo struct {
+	ConfigPath string `json:"config_path"`
+	ConfigHash string `json:"config_hash"`
+}
+
+func NewTelemtProxy(targetURL string, authHeader string) (*TelemtProxy, error) {
 	target, err := url.Parse(targetURL)
 	if err != nil {
 		return nil, err
@@ -35,5 +48,43 @@ func NewTelemtProxy(targetURL string, authHeader string) (http.Handler, error) {
 		},
 	}
 
-	return proxy, nil
+	return &TelemtProxy{
+		handler:    proxy,
+		targetURL:  targetURL,
+		authHeader: authHeader,
+	}, nil
+}
+
+func (p *TelemtProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	p.handler.ServeHTTP(w, r)
+}
+
+func (p *TelemtProxy) GetSystemInfo() (*SystemInfo, error) {
+	req, err := http.NewRequest("GET", p.targetURL+"/v1/system/info", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if p.authHeader != "" {
+		req.Header.Set("Authorization", p.authHeader)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("telemt API returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Data SystemInfo `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return &result.Data, nil
 }

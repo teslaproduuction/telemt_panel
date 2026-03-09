@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Activity, Shield, Network, ArrowUpCircle, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Users, Activity, Shield, Network, Settings, ArrowUpCircle, LogOut, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -9,6 +9,7 @@ const navItems = [
   { to: '/runtime', icon: Activity, label: 'Runtime' },
   { to: '/security', icon: Shield, label: 'Security' },
   { to: '/upstreams', icon: Network, label: 'Upstreams & DCs' },
+  { to: '/config', icon: Settings, label: 'Configuration' },
   { to: '/update', icon: ArrowUpCircle, label: 'Update' },
 ];
 

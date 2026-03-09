@@ -15,6 +15,7 @@ import (
 	"github.com/telemt/telemt-panel/internal/panel_updater"
 	"github.com/telemt/telemt-panel/internal/proxy"
 	"github.com/telemt/telemt-panel/internal/spa"
+	"github.com/telemt/telemt-panel/internal/telemt_config"
 	"github.com/telemt/telemt-panel/internal/updater"
 	"github.com/telemt/telemt-panel/internal/ws"
 )
@@ -244,6 +245,113 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 			return
 		}
 		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: map[string]string{"status": "restarting"}})
+	})))
+
+	// Telemt config endpoints
+	mux.Handle("GET /api/telemt/config/raw", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Get config path from Telemt API
+		systemInfo, err := telemtProxy.GetSystemInfo()
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "telemt_api_error", err.Error())
+			return
+		}
+
+		content, hash, err := telemt_config.ReadConfig(systemInfo.ConfigPath)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "read_config_failed", err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, jsonResponse{
+			OK: true,
+			Data: map[string]string{
+				"content": content,
+				"path":    systemInfo.ConfigPath,
+				"hash":    hash,
+			},
+		})
+	})))
+
+	mux.Handle("POST /api/telemt/config/save", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Content string `json:"content"`
+			Restart bool   `json:"restart"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "invalid request body")
+			return
+		}
+
+		// Get config path
+		systemInfo, err := telemtProxy.GetSystemInfo()
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "telemt_api_error", err.Error())
+			return
+		}
+
+		// Save config
+		newHash, err := telemt_config.SaveConfig(systemInfo.ConfigPath, req.Content)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "save_failed", err.Error())
+			return
+		}
+
+		// Restart if requested
+		if req.Restart {
+			if err := updater.RestartService(s.cfg.Telemt.ServiceName); err != nil {
+				writeError(w, http.StatusInternalServerError, "restart_failed", err.Error())
+				return
+			}
+		}
+
+		writeJSON(w, http.StatusOK, jsonResponse{
+			OK: true,
+			Data: map[string]interface{}{
+				"success":  true,
+				"new_hash": newHash,
+			},
+		})
+	})))
+
+	mux.Handle("POST /api/telemt/config/quick-update", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Updates map[string]interface{} `json:"updates"`
+			Restart bool                   `json:"restart"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "invalid request body")
+			return
+		}
+
+		// Get config path
+		systemInfo, err := telemtProxy.GetSystemInfo()
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "telemt_api_error", err.Error())
+			return
+		}
+
+		// Quick update
+		newHash, err := telemt_config.QuickUpdate(systemInfo.ConfigPath, req.Updates)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "update_failed", err.Error())
+			return
+		}
+
+		// Restart if requested
+		if req.Restart {
+			if err := updater.RestartService(s.cfg.Telemt.ServiceName); err != nil {
+				writeError(w, http.StatusInternalServerError, "restart_failed", err.Error())
+				return
+			}
+		}
+
+		writeJSON(w, http.StatusOK, jsonResponse{
+			OK: true,
+			Data: map[string]interface{}{
+				"success":  true,
+				"new_hash": newHash,
+			},
+		})
 	})))
 
 	// Telemt API proxy (kept for direct REST calls like user CRUD)
