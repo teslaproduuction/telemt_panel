@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 func DownloadFile(url string) (string, error) {
@@ -129,8 +128,8 @@ func BackupBinary(binaryPath string) error {
 	}
 	defer src.Close()
 
-	// Create backup with unique name in /tmp
-	backupPath := fmt.Sprintf("/tmp/%s.bak.%d", filepath.Base(binaryPath), time.Now().Unix())
+	// Create backup with fixed name in /tmp
+	backupPath := fmt.Sprintf("/tmp/%s.bak", filepath.Base(binaryPath))
 	dst, err := os.Create(backupPath)
 	if err != nil {
 		return err
@@ -149,16 +148,17 @@ func BackupBinary(binaryPath string) error {
 }
 
 func RestoreBackup(binaryPath string) error {
-	// Find the most recent backup
-	pattern := fmt.Sprintf("/tmp/%s.bak.*", filepath.Base(binaryPath))
-	matches, err := filepath.Glob(pattern)
-	if err != nil || len(matches) == 0 {
-		return fmt.Errorf("no backup found")
-	}
-
-	// Use the most recent backup (highest timestamp)
-	backupPath := matches[len(matches)-1]
+	backupPath := fmt.Sprintf("/tmp/%s.bak", filepath.Base(binaryPath))
 	return os.Rename(backupPath, binaryPath)
+}
+
+func RemoveBackup(binaryPath string) error {
+	backupPath := fmt.Sprintf("/tmp/%s.bak", filepath.Base(binaryPath))
+	err := os.Remove(backupPath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 func RestartService(serviceName string) error {

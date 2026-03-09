@@ -233,6 +233,13 @@ func (u *Updater) applyAsync() {
 	}
 	u.appendLog("systemctl restart succeeded")
 
+	// Remove backup after successful update
+	if err := RemoveBackup(u.binaryPath); err != nil {
+		u.appendLog(fmt.Sprintf("warning: failed to remove backup: %s", err))
+	} else {
+		u.appendLog("backup removed")
+	}
+
 	u.appendLog(fmt.Sprintf("updated to %s", release.TagName))
 	u.setStatus(PhaseDone, fmt.Sprintf("updated to %s", strings.TrimPrefix(release.TagName, "v")))
 }

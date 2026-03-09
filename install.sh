@@ -53,16 +53,6 @@ fi
 
 echo "Installed to $INSTALL_DIR/telemt-panel"
 
-# Create system user
-if ! id telemt-panel &>/dev/null; then
-  sudo useradd --system --no-create-home --shell /usr/sbin/nologin telemt-panel
-  echo "Created system user: telemt-panel"
-fi
-
-# Set ownership so panel can update itself
-sudo chown telemt-panel:telemt-panel "$INSTALL_DIR/telemt-panel"
-echo "Set ownership to telemt-panel user"
-
 # Config directory
 sudo mkdir -p "$CONFIG_DIR"
 
@@ -100,7 +90,6 @@ EOF
 
   sudo mv /tmp/telemt-panel-config.toml "$CONFIG_DIR/config.toml"
   sudo chmod 600 "$CONFIG_DIR/config.toml"
-  sudo chown telemt-panel:telemt-panel "$CONFIG_DIR/config.toml"
   echo "Config saved to $CONFIG_DIR/config.toml"
 fi
 
@@ -112,15 +101,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=telemt-panel
-Group=telemt-panel
 ExecStart=/usr/local/bin/telemt-panel --config /etc/telemt-panel/config.toml
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
-NoNewPrivileges=true
-ProtectHome=true
-ReadOnlyPaths=/etc/telemt-panel
 
 [Install]
 WantedBy=multi-user.target

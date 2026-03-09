@@ -271,12 +271,12 @@ func (u *Updater) applyAsync() {
 	u.appendLog("sha256 checksum verified OK")
 
 	// Backup current binary
-	u.setStatus(PhaseReplacing, fmt.Sprintf("backing up %s to %s.bak", u.binaryPath, u.binaryPath))
+	u.setStatus(PhaseReplacing, fmt.Sprintf("backing up %s to /tmp", u.binaryPath))
 	if err := BackupBinary(u.binaryPath); err != nil {
 		u.setError(fmt.Errorf("backup %s: %w", u.binaryPath, err))
 		return
 	}
-	u.appendLog(fmt.Sprintf("backup created: %s.bak", u.binaryPath))
+	u.appendLog(fmt.Sprintf("backup created in /tmp"))
 
 	// Extract new binary
 	u.setStatus(PhaseReplacing, fmt.Sprintf("extracting to %s", u.binaryPath))
@@ -321,6 +321,13 @@ func (u *Updater) applyAsync() {
 		return
 	}
 	u.appendLog("healthcheck passed")
+
+	// Remove backup after successful update
+	if err := RemoveBackup(u.binaryPath); err != nil {
+		u.appendLog(fmt.Sprintf("warning: failed to remove backup: %s", err))
+	} else {
+		u.appendLog("backup removed")
+	}
 
 	// Verify version
 	newVersion, err := u.fetchCurrentVersion()
