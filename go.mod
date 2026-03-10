@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/oschwald/maxminddb-golang v1.13.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect

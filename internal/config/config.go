@@ -16,6 +16,11 @@ type Config struct {
 	Panel  PanelConfig  `toml:"panel"`
 	Auth   AuthConfig   `toml:"auth"`
 	TLS    TLSConfig    `toml:"tls"`
+	GeoIP  GeoIPConfig  `toml:"geoip"`
+}
+
+type GeoIPConfig struct {
+	DBPath string `toml:"db_path"`
 }
 
 type TLSConfig struct {

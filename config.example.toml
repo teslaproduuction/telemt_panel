@@ -35,6 +35,12 @@ auth_header = "your-telemt-api-secret"
 # Note: cert_file and acme_domain are mutually exclusive.
 # If neither is set, the panel runs on plain HTTP.
 
+[geoip]
+# Path to MaxMind GeoLite2 City database (.mmdb)
+# Download from: https://dev.maxmind.com/geoip/geolite2-free-geolocation-data
+# If not set, GeoIP features are disabled (IP lists shown without geo data)
+# db_path = "/var/lib/telemt-panel/GeoLite2-City.mmdb"
+
 [auth]
 # Panel admin credentials
 username = "admin"

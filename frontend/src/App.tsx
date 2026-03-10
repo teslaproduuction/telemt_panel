@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { LoginPage } from '@/pages/LoginPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { UsersPage } from '@/pages/UsersPage';
+import { UserDetailPage } from '@/pages/UserDetailPage';
 import { RuntimePage } from '@/pages/RuntimePage';
 import { SecurityPage } from '@/pages/SecurityPage';
 import { UpstreamsPage } from '@/pages/UpstreamsPage';
@@ -32,6 +33,7 @@ function AuthenticatedApp() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/users/:username" element={<UserDetailPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/runtime" element={<RuntimePage />} />
           <Route path="/security" element={<SecurityPage />} />

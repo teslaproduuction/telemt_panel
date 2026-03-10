@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/table';
 import { usePolling } from '@/hooks/usePolling';
 import { telemt, ApiError } from '@/lib/api';
+import { Link } from 'react-router-dom';
 import { Copy, Plus, Pencil, Trash2, Check } from 'lucide-react';
 import { formatBytes } from '@/lib/utils';
 
@@ -30,6 +31,8 @@ interface UserInfo {
   active_unique_ips: number;
   recent_unique_ips: number;
   total_octets: number;
+  active_unique_ips_list?: string[];
+  recent_unique_ips_list?: string[];
   links?: UserLinks;
 }
 
@@ -173,7 +176,9 @@ export function UsersPage() {
 
                     return (
                       <TableRow key={u.username}>
-                        <TableCell className="font-medium">{u.username}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link to={`/users/${u.username}`} className="text-accent hover:underline">{u.username}</Link>
+                        </TableCell>
                         <TableCell>
                           {allLinks.length > 0 ? (
                             <div className="flex flex-col gap-1">
@@ -254,7 +259,7 @@ export function UsersPage() {
               return (
                 <div key={u.username} className="bg-surface border border-border rounded-lg p-3 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-text-primary">{u.username}</h3>
+                    <Link to={`/users/${u.username}`} className="font-medium text-accent hover:underline">{u.username}</Link>
                     <div className="flex gap-1">
                       <button
                         onClick={() => setEditUser(u)}

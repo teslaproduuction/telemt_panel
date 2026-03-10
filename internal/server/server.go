@@ -12,6 +12,7 @@ import (
 
 	"github.com/telemt/telemt-panel/internal/auth"
 	"github.com/telemt/telemt-panel/internal/config"
+	"github.com/telemt/telemt-panel/internal/geoip"
 	"github.com/telemt/telemt-panel/internal/panel_updater"
 	"github.com/telemt/telemt-panel/internal/proxy"
 	"github.com/telemt/telemt-panel/internal/spa"
@@ -352,6 +353,42 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 				"new_hash": newHash,
 			},
 		})
+	})))
+
+	// GeoIP lookup endpoint
+	var geoipLookup *geoip.Lookup
+	if s.cfg.GeoIP.DBPath != "" {
+		var geoErr error
+		geoipLookup, geoErr = geoip.New(s.cfg.GeoIP.DBPath)
+		if geoErr != nil {
+			log.Printf("WARNING: failed to open GeoIP database: %s", geoErr)
+		} else {
+			defer geoipLookup.Close()
+		}
+	}
+
+	mux.Handle("POST /api/geoip/lookup", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if geoipLookup == nil {
+			writeError(w, http.StatusServiceUnavailable, "geoip_disabled", "GeoIP database is not configured")
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		var req struct {
+			IPs []string `json:"ips"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "invalid request body")
+			return
+		}
+
+		if len(req.IPs) > 2000 {
+			writeError(w, http.StatusBadRequest, "too_many_ips", "maximum 2000 IPs per request")
+			return
+		}
+
+		results := geoipLookup.LookupIPs(req.IPs)
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: results})
 	})))
 
 	// Telemt API proxy (kept for direct REST calls like user CRUD)
