@@ -140,6 +140,57 @@ interface PoolStateData {
   };
 }
 
+interface MeSelftestKdfData {
+  state: string;
+  ewma_errors_per_min: number;
+  threshold_errors_per_min: number;
+  errors_total: number;
+}
+
+interface MeSelftestTimeskewData {
+  state: string;
+  max_skew_secs_15m: number | null;
+  samples_15m: number;
+  last_skew_secs: number | null;
+  last_source: string | null;
+  last_seen_age_secs: number | null;
+}
+
+interface MeSelftestIpFamilyData {
+  addr: string;
+  state: string;
+}
+
+interface MeSelftestIpData {
+  v4?: MeSelftestIpFamilyData;
+  v6?: MeSelftestIpFamilyData;
+}
+
+interface MeSelftestPidData {
+  pid: number;
+  state: string;
+}
+
+interface MeSelftestBndData {
+  addr_state: string;
+  port_state: string;
+  last_addr: string | null;
+  last_seen_age_secs: number | null;
+}
+
+interface MeSelftestData {
+  enabled: boolean;
+  reason?: string;
+  generated_at_epoch_secs: number;
+  data?: {
+    kdf: MeSelftestKdfData;
+    timeskew: MeSelftestTimeskewData;
+    ip: MeSelftestIpData;
+    pid: MeSelftestPidData;
+    bnd: MeSelftestBndData;
+  };
+}
+
 interface NatStunData {
   enabled: boolean;
   reason?: string;
@@ -191,6 +242,7 @@ const ENDPOINTS = [
   '/v1/runtime/me_quality',
   '/v1/runtime/upstream_quality',
   '/v1/runtime/nat_stun',
+  '/v1/runtime/me-selftest',
   '/v1/runtime/connections/summary',
   '/v1/runtime/events/recent',
 ];
@@ -203,6 +255,7 @@ export function RuntimePage() {
   const meQuality = useEndpoint<MeQualityData>(wsData, '/v1/runtime/me_quality');
   const upstreamQuality = useEndpoint<UpstreamQualityData>(wsData, '/v1/runtime/upstream_quality');
   const natStun = useEndpoint<NatStunData>(wsData, '/v1/runtime/nat_stun');
+  const meSelftest = useEndpoint<MeSelftestData>(wsData, '/v1/runtime/me-selftest');
   const connections = useEndpoint<ConnectionsData>(wsData, '/v1/runtime/connections/summary');
   const events = useEndpoint<EventsData>(wsData, '/v1/runtime/events/recent');
 
@@ -576,6 +629,181 @@ export function RuntimePage() {
                   </div>
                 </div>
               )}
+            </div>
+          </CollapsibleSection>
+        )}
+
+        {/* ME Self-Test */}
+        {meSelftest?.data && (
+          <CollapsibleSection title="ME Self-Test">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {/* KDF */}
+              <div className="bg-background rounded p-3 border border-border/50">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-semibold text-accent uppercase tracking-wide">KDF</h4>
+                  <span className={cn(
+                    'text-xs font-medium px-2 py-0.5 rounded',
+                    meSelftest.data.kdf.state === 'ok'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-danger/10 text-danger'
+                  )}>
+                    {meSelftest.data.kdf.state}
+                  </span>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">EWMA errors/min</span>
+                    <span className="text-text-primary font-medium">{meSelftest.data.kdf.ewma_errors_per_min.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">Threshold</span>
+                    <span className="text-text-primary font-medium">{meSelftest.data.kdf.threshold_errors_per_min.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">Total errors</span>
+                    <span className="text-text-primary font-medium">{formatNumber(meSelftest.data.kdf.errors_total)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Timeskew */}
+              <div className="bg-background rounded p-3 border border-border/50">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-semibold text-accent uppercase tracking-wide">Time Skew</h4>
+                  <span className={cn(
+                    'text-xs font-medium px-2 py-0.5 rounded',
+                    meSelftest.data.timeskew.state === 'ok'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-danger/10 text-danger'
+                  )}>
+                    {meSelftest.data.timeskew.state}
+                  </span>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">Max skew (15m)</span>
+                    <span className="text-text-primary font-medium">
+                      {meSelftest.data.timeskew.max_skew_secs_15m != null ? `${meSelftest.data.timeskew.max_skew_secs_15m}s` : '-'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">Samples (15m)</span>
+                    <span className="text-text-primary font-medium">{meSelftest.data.timeskew.samples_15m}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">Last skew</span>
+                    <span className="text-text-primary font-medium">
+                      {meSelftest.data.timeskew.last_skew_secs != null ? `${meSelftest.data.timeskew.last_skew_secs}s` : '-'}
+                    </span>
+                  </div>
+                  {meSelftest.data.timeskew.last_source && (
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Source</span>
+                      <span className="text-text-primary font-medium">{meSelftest.data.timeskew.last_source}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* BND */}
+              <div className="bg-background rounded p-3 border border-border/50">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-semibold text-accent uppercase tracking-wide">BND</h4>
+                  <div className="flex gap-1">
+                    <span className={cn(
+                      'text-xs font-medium px-2 py-0.5 rounded',
+                      meSelftest.data.bnd.addr_state === 'ok'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-danger/10 text-danger'
+                    )}>
+                      addr: {meSelftest.data.bnd.addr_state}
+                    </span>
+                    <span className={cn(
+                      'text-xs font-medium px-2 py-0.5 rounded',
+                      meSelftest.data.bnd.port_state === 'ok'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-danger/10 text-danger'
+                    )}>
+                      port: {meSelftest.data.bnd.port_state}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">Last addr</span>
+                    <span className="text-text-primary font-medium font-mono">
+                      {meSelftest.data.bnd.last_addr ?? '-'}
+                    </span>
+                  </div>
+                  {meSelftest.data.bnd.last_seen_age_secs != null && (
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Last seen</span>
+                      <span className="text-text-primary font-medium">{meSelftest.data.bnd.last_seen_age_secs}s ago</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* IP */}
+              <div className="bg-background rounded p-3 border border-border/50">
+                <h4 className="text-xs font-semibold text-accent uppercase tracking-wide mb-2">IP Interfaces</h4>
+                <div className="space-y-2 text-xs">
+                  {meSelftest.data.ip.v4 && (
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-text-secondary">IPv4: </span>
+                        <span className="text-text-primary font-mono">{meSelftest.data.ip.v4.addr}</span>
+                      </div>
+                      <span className={cn(
+                        'text-xs font-medium px-2 py-0.5 rounded',
+                        meSelftest.data.ip.v4.state === 'good'
+                          ? 'bg-success/10 text-success'
+                          : 'bg-danger/10 text-danger'
+                      )}>
+                        {meSelftest.data.ip.v4.state}
+                      </span>
+                    </div>
+                  )}
+                  {meSelftest.data.ip.v6 && (
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-text-secondary">IPv6: </span>
+                        <span className="text-text-primary font-mono">{meSelftest.data.ip.v6.addr}</span>
+                      </div>
+                      <span className={cn(
+                        'text-xs font-medium px-2 py-0.5 rounded',
+                        meSelftest.data.ip.v6.state === 'good'
+                          ? 'bg-success/10 text-success'
+                          : 'bg-danger/10 text-danger'
+                      )}>
+                        {meSelftest.data.ip.v6.state}
+                      </span>
+                    </div>
+                  )}
+                  {!meSelftest.data.ip.v4 && !meSelftest.data.ip.v6 && (
+                    <span className="text-text-secondary">No interface data</span>
+                  )}
+                </div>
+              </div>
+
+              {/* PID */}
+              <div className="bg-background rounded p-3 border border-border/50">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-semibold text-accent uppercase tracking-wide">PID</h4>
+                  <span className={cn(
+                    'text-xs font-medium px-2 py-0.5 rounded',
+                    meSelftest.data.pid.state === 'non-one'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-warning/10 text-warning'
+                  )}>
+                    {meSelftest.data.pid.state}
+                  </span>
+                </div>
+                <div className="text-xs flex justify-between">
+                  <span className="text-text-secondary">PID</span>
+                  <span className="text-text-primary font-medium font-mono">{meSelftest.data.pid.pid}</span>
+                </div>
+              </div>
             </div>
           </CollapsibleSection>
         )}
