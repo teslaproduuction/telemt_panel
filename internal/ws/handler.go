@@ -169,10 +169,14 @@ func (h *Handler) fetchAndSend(endpoint string, send func(ServerMessage)) {
 		return
 	}
 
-	// Parse the Telemt response envelope { ok, data, ... }
+	// Parse the Telemt response envelope { ok, data, error: {code, message} }
 	var envelope struct {
 		OK   bool            `json:"ok"`
 		Data json.RawMessage `json:"data"`
+		Err  *struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
 	}
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		send(ServerMessage{Type: "error", Endpoint: endpoint, Error: "invalid response"})
@@ -180,7 +184,18 @@ func (h *Handler) fetchAndSend(endpoint string, send func(ServerMessage)) {
 	}
 
 	if !envelope.OK {
-		send(ServerMessage{Type: "error", Endpoint: endpoint, Error: "telemt returned error"})
+		errMsg := "telemt returned error"
+		if envelope.Err != nil {
+			switch {
+			case envelope.Err.Code != "" && envelope.Err.Message != "":
+				errMsg = envelope.Err.Code + ": " + envelope.Err.Message
+			case envelope.Err.Message != "":
+				errMsg = envelope.Err.Message
+			case envelope.Err.Code != "":
+				errMsg = envelope.Err.Code
+			}
+		}
+		send(ServerMessage{Type: "error", Endpoint: endpoint, Error: errMsg})
 		return
 	}
 
