@@ -15,7 +15,7 @@ COPY go.sum* ./
 COPY . .
 RUN go mod tidy
 COPY --from=frontend /app/dist/ ./dist/
-ARG VERSION=0.1.0
+ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags="-s -w -X main.version=${VERSION}" -o telemt-panel .
 
 # Stage 3: Minimal runtime (static binary — no libc dependency)
