@@ -6,9 +6,22 @@ import (
 	"strings"
 )
 
-func NewHandler(distFS fs.FS) http.Handler {
+func NewHandler(distFS fs.FS, basePath string) http.Handler {
 	fsys, _ := fs.Sub(distFS, "dist")
 	fileServer := http.FileServer(http.FS(fsys))
+
+	// Read and patch index.html once at startup
+	indexHTML, _ := fs.ReadFile(fsys, "index.html")
+	var patchedIndex []byte
+	if len(indexHTML) > 0 {
+		baseHref := basePath + "/"
+		if basePath == "" {
+			baseHref = "/"
+		}
+		injection := `<base href="` + baseHref + `">` +
+			`<script>window.__BASE_PATH__="` + basePath + `"</script>`
+		patchedIndex = []byte(strings.Replace(string(indexHTML), "<head>", "<head>"+injection, 1))
+	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/")
@@ -18,13 +31,20 @@ func NewHandler(distFS fs.FS) http.Handler {
 
 		f, err := fsys.Open(path)
 		if err != nil {
-			// SPA fallback: serve index.html for client-side routing
-			r.URL.Path = "/"
+			// SPA fallback: serve patched index.html for client-side routing
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-			fileServer.ServeHTTP(w, r)
+			w.Write(patchedIndex)
 			return
 		}
 		f.Close()
+
+		if path == "index.html" {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Write(patchedIndex)
+			return
+		}
 
 		// Long cache for hashed assets
 		if strings.HasPrefix(path, "assets/") {

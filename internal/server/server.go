@@ -395,7 +395,7 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 	mux.Handle("/api/telemt/", auth.RequireAuth(jwtSecret, telemtProxy))
 
 	// SPA
-	mux.Handle("/", spa.NewHandler(distFS))
+	mux.Handle("/", spa.NewHandler(distFS, s.cfg.BasePath))
 
 	// Wrap mux with security headers
 	handler := securityHeaders(mux)

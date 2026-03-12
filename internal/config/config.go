@@ -11,12 +11,13 @@ import (
 )
 
 type Config struct {
-	Listen string       `toml:"listen"`
-	Telemt TelemtConfig `toml:"telemt"`
-	Panel  PanelConfig  `toml:"panel"`
-	Auth   AuthConfig   `toml:"auth"`
-	TLS    TLSConfig    `toml:"tls"`
-	GeoIP  GeoIPConfig  `toml:"geoip"`
+	Listen   string       `toml:"listen"`
+	BasePath string       `toml:"base_path"`
+	Telemt   TelemtConfig `toml:"telemt"`
+	Panel    PanelConfig  `toml:"panel"`
+	Auth     AuthConfig   `toml:"auth"`
+	TLS      TLSConfig    `toml:"tls"`
+	GeoIP    GeoIPConfig  `toml:"geoip"`
 }
 
 type GeoIPConfig struct {
@@ -86,6 +87,12 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Panel.GithubRepo == "" {
 		cfg.Panel.GithubRepo = "amirotin/telemt_panel"
+	}
+
+	// Normalize base_path: ensure leading slash, strip trailing slash
+	cfg.BasePath = strings.TrimRight(cfg.BasePath, "/")
+	if cfg.BasePath != "" && !strings.HasPrefix(cfg.BasePath, "/") {
+		cfg.BasePath = "/" + cfg.BasePath
 	}
 
 	if cfg.TLS.AcmeCacheDir == "" {

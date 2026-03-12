@@ -1,5 +1,6 @@
-const TELEMT_BASE = '/api/telemt';
-const AUTH_BASE = '/api/auth';
+const BASE = (window as any).__BASE_PATH__ || '';
+const TELEMT_BASE = `${BASE}/api/telemt`;
+const AUTH_BASE = `${BASE}/api/auth`;
 
 export class ApiError extends Error {
   constructor(public code: string, message: string) {
@@ -19,7 +20,7 @@ async function request<T>(base: string, path: string, options?: RequestInit): Pr
   });
 
   if (res.status === 401 && base === TELEMT_BASE) {
-    window.location.href = '/login';
+    window.location.href = `${BASE}/login`;
     throw new ApiError('unauthorized', 'Session expired');
   }
 
@@ -41,7 +42,8 @@ export const telemt = {
     request<T>(TELEMT_BASE, path, { method: 'DELETE' }),
 };
 
-const PANEL_BASE = '/api';
+const PANEL_BASE = `${BASE}/api`;
+
 
 export const panelApi = {
   get: <T>(path: string) => request<T>(PANEL_BASE, path),

@@ -82,7 +82,8 @@ export function useWsProvider(): WsContextValue {
     if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) return;
 
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${proto}//${window.location.host}/api/ws`);
+    const base = (window as any).__BASE_PATH__ || '';
+    const ws = new WebSocket(`${proto}//${window.location.host}${base}/api/ws`);
     wsRef.current = ws;
 
     ws.onopen = () => {
