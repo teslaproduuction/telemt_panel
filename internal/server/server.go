@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -141,10 +142,14 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 			return
 		}
 
+		cookiePath := "/"
+		if s.cfg.BasePath != "" {
+			cookiePath = s.cfg.BasePath + "/"
+		}
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session",
 			Value:    token,
-			Path:     "/",
+			Path:     cookiePath,
 			MaxAge:   int(ttl.Seconds()),
 			HttpOnly: true,
 			SameSite: http.SameSiteStrictMode,
@@ -158,10 +163,14 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 	})
 
 	mux.HandleFunc("POST /api/auth/logout", func(w http.ResponseWriter, r *http.Request) {
+		cookiePath := "/"
+		if s.cfg.BasePath != "" {
+			cookiePath = s.cfg.BasePath + "/"
+		}
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session",
 			Value:    "",
-			Path:     "/",
+			Path:     cookiePath,
 			MaxAge:   -1,
 			HttpOnly: true,
 			SameSite: http.SameSiteStrictMode,
@@ -397,8 +406,12 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 	// SPA
 	mux.Handle("/", spa.NewHandler(distFS, s.cfg.BasePath))
 
-	// Wrap mux with security headers
-	handler := securityHeaders(mux)
+	// Build handler chain: securityHeaders → basePathHandler (if needed) → mux
+	var handler http.Handler = mux
+	if s.cfg.BasePath != "" {
+		handler = basePathHandler(s.cfg.BasePath, mux)
+	}
+	handler = securityHeaders(handler)
 
 	srv := &http.Server{
 		Addr:         s.cfg.Listen,
@@ -448,6 +461,31 @@ func securityHeaders(next http.Handler) http.Handler {
 		if r.TLS != nil {
 			w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// basePathHandler strips the base path prefix from incoming requests.
+// GET /{basePath} → 301 redirect to /{basePath}/
+// /{basePath}/... → strip prefix, pass to next handler
+// anything else → 404
+func basePathHandler(basePath string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Exact match without trailing slash → redirect
+		if r.URL.Path == basePath {
+			http.Redirect(w, r, basePath+"/", http.StatusMovedPermanently)
+			return
+		}
+
+		prefix := basePath + "/"
+		if !strings.HasPrefix(r.URL.Path, prefix) {
+			http.NotFound(w, r)
+			return
+		}
+
+		// Strip base path, keep leading slash
+		r.URL.Path = "/" + strings.TrimPrefix(r.URL.Path, prefix)
+		r.URL.RawPath = ""
 		next.ServeHTTP(w, r)
 	})
 }

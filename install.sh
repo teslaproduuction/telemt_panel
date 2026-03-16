@@ -60,8 +60,8 @@ if [ ! -f "$CONFIG_DIR/config.toml" ]; then
   echo ""
   echo "Setting up initial configuration..."
 
-  read -rp "Telemt API URL [http://127.0.0.1:2398]: " TELEMT_URL < /dev/tty
-  TELEMT_URL="${TELEMT_URL:-http://127.0.0.1:2398}"
+  read -rp "Telemt API URL [http://127.0.0.1:9091]: " TELEMT_URL < /dev/tty
+  TELEMT_URL="${TELEMT_URL:-http://127.0.0.1:9091}"
 
   read -rp "Telemt API auth header (leave empty if none): " TELEMT_AUTH < /dev/tty
 

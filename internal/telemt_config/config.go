@@ -49,6 +49,12 @@ func SaveConfig(configPath, content string) (newHash string, err error) {
 		return "", fmt.Errorf("create backup: %w", err)
 	}
 
+	// Read original file stat to preserve ownership and permissions
+	origStat, err := os.Stat(configPath)
+	if err != nil && !os.IsNotExist(err) {
+		return "", fmt.Errorf("stat config: %w", err)
+	}
+
 	// Atomic write: write to temp file, then rename
 	dir := filepath.Dir(configPath)
 	tmpFile, err := os.CreateTemp(dir, "config-*.tmp")
@@ -63,6 +69,11 @@ func SaveConfig(configPath, content string) (newHash string, err error) {
 		return "", fmt.Errorf("write temp file: %w", err)
 	}
 	tmpFile.Close()
+
+	// Preserve original file permissions and ownership
+	if origStat != nil {
+		preserveFileOwnership(tmpPath, origStat)
+	}
 
 	// Atomic rename
 	if err := os.Rename(tmpPath, configPath); err != nil {
@@ -154,14 +165,22 @@ func deleteNestedKey(m map[string]interface{}, key string) {
 }
 
 func createBackup(src, dst string) error {
-	data, err := os.ReadFile(src)
+	srcStat, err := os.Stat(src)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil // no file to backup
 		}
 		return err
 	}
-	return os.WriteFile(dst, data, 0644)
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(dst, data, srcStat.Mode().Perm()); err != nil {
+		return err
+	}
+	preserveFileOwnership(dst, srcStat)
+	return nil
 }
 
 func calculateHash(data []byte) string {

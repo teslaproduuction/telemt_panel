@@ -91,8 +91,8 @@ func ExtractBinary(tarGzPath, destPath string) error {
 			continue
 		}
 
-		// Create temp file in /tmp instead of destination directory
-		tmp, err := os.CreateTemp("/tmp", ".panel-update-*")
+		// Create temp file next to destination so rename is same-filesystem
+		tmp, err := os.CreateTemp(filepath.Dir(destPath), ".panel-update-*")
 		if err != nil {
 			return err
 		}
@@ -118,6 +118,10 @@ func ExtractBinary(tarGzPath, destPath string) error {
 	}
 }
 
+func backupPath(binaryPath string) string {
+	return binaryPath + ".bak"
+}
+
 func BackupBinary(binaryPath string) error {
 	src, err := os.Open(binaryPath)
 	if err != nil {
@@ -128,9 +132,7 @@ func BackupBinary(binaryPath string) error {
 	}
 	defer src.Close()
 
-	// Create backup with fixed name in /tmp
-	backupPath := fmt.Sprintf("/tmp/%s.bak", filepath.Base(binaryPath))
-	dst, err := os.Create(backupPath)
+	dst, err := os.Create(backupPath(binaryPath))
 	if err != nil {
 		return err
 	}
@@ -144,17 +146,15 @@ func BackupBinary(binaryPath string) error {
 	if err != nil {
 		return err
 	}
-	return os.Chmod(backupPath, info.Mode())
+	return os.Chmod(backupPath(binaryPath), info.Mode())
 }
 
 func RestoreBackup(binaryPath string) error {
-	backupPath := fmt.Sprintf("/tmp/%s.bak", filepath.Base(binaryPath))
-	return os.Rename(backupPath, binaryPath)
+	return os.Rename(backupPath(binaryPath), binaryPath)
 }
 
 func RemoveBackup(binaryPath string) error {
-	backupPath := fmt.Sprintf("/tmp/%s.bak", filepath.Base(binaryPath))
-	err := os.Remove(backupPath)
+	err := os.Remove(backupPath(binaryPath))
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}

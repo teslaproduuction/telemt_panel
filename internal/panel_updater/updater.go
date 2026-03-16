@@ -244,14 +244,14 @@ func (u *Updater) applyAsync() {
 	u.appendLog("sha256 checksum verified OK")
 
 	// Backup current binary
-	u.setStatus(PhaseReplacing, fmt.Sprintf("backing up %s to /tmp", u.binaryPath))
+	u.setStatus(PhaseReplacing, fmt.Sprintf("backing up %s", u.binaryPath))
 	if err := BackupBinary(u.binaryPath); err != nil {
 		os.Remove(tarPath)
 		os.Remove(shaPath)
 		u.setError(fmt.Errorf("backup %s: %w", u.binaryPath, err))
 		return
 	}
-	u.appendLog(fmt.Sprintf("backup created in /tmp"))
+	u.appendLog("backup created")
 
 	// Extract new binary
 	u.setStatus(PhaseReplacing, fmt.Sprintf("extracting to %s", u.binaryPath))

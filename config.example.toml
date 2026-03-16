@@ -3,9 +3,18 @@
 # Address and port the panel listens on
 listen = "0.0.0.0:8080"
 
+# Base path for running behind a reverse proxy (e.g. "/panel123")
+# The panel strips this prefix from incoming requests internally.
+# Your proxy config stays simple — just forward the path as-is:
+#
+#   Caddy:  handle /panel123* { reverse_proxy 127.0.0.1:8080 }
+#   nginx:  location /panel123/ { proxy_pass http://127.0.0.1:8080/panel123/; }
+#
+# base_path = "/panel123"
+
 [telemt]
 # Telemt API base URL (no trailing slash)
-url = "http://127.0.0.1:2398"
+url = "http://127.0.0.1:9091"
 # Authorization header value sent to Telemt API
 auth_header = "your-telemt-api-secret"
 # Path to telemt binary (default: /bin/telemt)
