@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Header } from '@/components/layout/Header';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -11,8 +11,11 @@ import {
 import { usePolling } from '@/hooks/usePolling';
 import { telemt, ApiError } from '@/lib/api';
 import { Link } from 'react-router-dom';
-import { Copy, Plus, Pencil, Trash2, Check } from 'lucide-react';
+import { Copy, Plus, Pencil, Trash2, Check, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { formatBytes } from '@/lib/utils';
+
+type SortKey = 'username' | 'current_connections' | 'active_unique_ips' | 'total_octets' | 'expiration_rfc3339';
+type SortDir = 'asc' | 'desc';
 
 interface UserLinks {
   classic?: string[];
@@ -99,6 +102,48 @@ export function UsersPage() {
     10000
   );
 
+  const [sortKey, setSortKey] = useState<SortKey>('username');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const toggleSort = useCallback((key: SortKey) => {
+    setSortKey((prev) => {
+      if (prev === key) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        return key;
+      }
+      setSortDir('asc');
+      return key;
+    });
+  }, []);
+
+  const sortedUsers = useMemo(() => {
+    if (!users) return [];
+    return [...users].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'username':
+          cmp = a.username.localeCompare(b.username);
+          break;
+        case 'current_connections':
+          cmp = a.current_connections - b.current_connections;
+          break;
+        case 'active_unique_ips':
+          cmp = a.active_unique_ips - b.active_unique_ips;
+          break;
+        case 'total_octets':
+          cmp = a.total_octets - b.total_octets;
+          break;
+        case 'expiration_rfc3339': {
+          const ta = a.expiration_rfc3339 ? new Date(a.expiration_rfc3339).getTime() : 0;
+          const tb = b.expiration_rfc3339 ? new Date(b.expiration_rfc3339).getTime() : 0;
+          cmp = ta - tb;
+          break;
+        }
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [users, sortKey, sortDir]);
+
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserInfo | null>(null);
   const [deleteUser, setDeleteUser] = useState<string | null>(null);
@@ -153,29 +198,55 @@ export function UsersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Username</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('username')}>
+                    <span className="inline-flex items-center gap-1">
+                      Username
+                      {sortKey === 'username' ? (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} className="text-text-secondary/40" />}
+                    </span>
+                  </TableHead>
                   <TableHead>Proxy Links</TableHead>
-                  <TableHead>Connections</TableHead>
-                  <TableHead>Active IPs</TableHead>
-                  <TableHead>Traffic</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('current_connections')}>
+                    <span className="inline-flex items-center gap-1">
+                      Connections
+                      {sortKey === 'current_connections' ? (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} className="text-text-secondary/40" />}
+                    </span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('active_unique_ips')}>
+                    <span className="inline-flex items-center gap-1">
+                      Active IPs
+                      {sortKey === 'active_unique_ips' ? (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} className="text-text-secondary/40" />}
+                    </span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('total_octets')}>
+                    <span className="inline-flex items-center gap-1">
+                      Traffic
+                      {sortKey === 'total_octets' ? (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} className="text-text-secondary/40" />}
+                    </span>
+                  </TableHead>
                   <TableHead>Quota</TableHead>
-                  <TableHead>Expiration</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('expiration_rfc3339')}>
+                    <span className="inline-flex items-center gap-1">
+                      Expiration
+                      {sortKey === 'expiration_rfc3339' ? (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} className="text-text-secondary/40" />}
+                    </span>
+                  </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(!users || users.length === 0) ? (
+                {sortedUsers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center text-text-secondary py-8">
                       No users configured
                     </TableCell>
                   </TableRow>
                 ) : (
-                  users.map((u) => {
+                  sortedUsers.map((u) => {
                     const allLinks = collectLinks(u.links);
+                    const hasConns = u.current_connections > 0;
 
                     return (
-                      <TableRow key={u.username}>
+                      <TableRow key={u.username} className={hasConns ? 'bg-success/5 hover:bg-success/10' : ''}>
                         <TableCell className="font-medium">
                           <Link to={`/users/${u.username}`} className="text-accent hover:underline">{u.username}</Link>
                         </TableCell>
@@ -248,16 +319,17 @@ export function UsersPage() {
 
         {/* Mobile Cards */}
         <div className="lg:hidden space-y-3">
-          {(!users || users.length === 0) ? (
+          {sortedUsers.length === 0 ? (
             <div className="text-center text-text-secondary py-8 bg-surface border border-border rounded-lg">
               No users configured
             </div>
           ) : (
-            users.map((u) => {
+            sortedUsers.map((u) => {
               const allLinks = collectLinks(u.links);
+              const hasConns = u.current_connections > 0;
 
               return (
-                <div key={u.username} className="bg-surface border border-border rounded-lg p-3 space-y-3">
+                <div key={u.username} className={`bg-surface border rounded-lg p-3 space-y-3 ${hasConns ? 'border-success/40 bg-success/5' : 'border-border'}`}>
                   <div className="flex items-center justify-between">
                     <Link to={`/users/${u.username}`} className="font-medium text-accent hover:underline">{u.username}</Link>
                     <div className="flex gap-1">

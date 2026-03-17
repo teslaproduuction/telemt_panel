@@ -4,8 +4,11 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { StartupStatus } from '@/components/StartupStatus';
 import { useWsSubscription, useEndpoint } from '@/hooks/useWebSocket';
-import { formatUptime, formatNumber } from '@/lib/utils';
-import { Activity, Wifi, WifiOff, Clock, Users } from 'lucide-react';
+import { usePolling } from '@/hooks/usePolling';
+import { telemt } from '@/lib/api';
+import { formatUptime, formatNumber, formatBytes } from '@/lib/utils';
+import { Activity, Wifi, WifiOff, Clock, Users, ArrowUpDown } from 'lucide-react';
+import { useMemo } from 'react';
 
 interface HealthData {
   status: string;
@@ -31,6 +34,10 @@ interface GatesData {
   [key: string]: unknown;
 }
 
+interface UserTrafficData {
+  total_octets: number;
+}
+
 const ENDPOINTS = ['/v1/health', '/v1/stats/summary', '/v1/system/info', '/v1/runtime/gates'];
 
 export function DashboardPage() {
@@ -40,6 +47,16 @@ export function DashboardPage() {
   const summary = useEndpoint<SummaryData>(wsData, '/v1/stats/summary');
   const system = useEndpoint<SystemInfoData>(wsData, '/v1/system/info');
   const gates = useEndpoint<GatesData>(wsData, '/v1/runtime/gates');
+
+  const { data: usersData } = usePolling<UserTrafficData[]>(
+    () => telemt.get('/v1/users'),
+    10000
+  );
+
+  const totalTraffic = useMemo(() => {
+    if (!usersData) return 0;
+    return usersData.reduce((sum, u) => sum + u.total_octets, 0);
+  }, [usersData]);
 
   const isHealthy = health?.status === 'ok';
   const firstError = Object.values(errors)[0];
@@ -90,7 +107,7 @@ export function DashboardPage() {
 
         {/* Metric Cards */}
         {summary && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
             <MetricCard
               label="Uptime"
               value={formatUptime(summary.uptime_seconds)}
@@ -111,6 +128,11 @@ export function DashboardPage() {
               label="Configured Users"
               value={summary.configured_users}
               icon={<Users size={14} className="lg:w-4 lg:h-4" />}
+            />
+            <MetricCard
+              label="Total Traffic"
+              value={formatBytes(totalTraffic)}
+              icon={<ArrowUpDown size={14} className="lg:w-4 lg:h-4" />}
             />
           </div>
         )}
