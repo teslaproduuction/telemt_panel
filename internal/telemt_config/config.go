@@ -80,6 +80,11 @@ func SaveConfig(configPath, content string) (newHash string, err error) {
 		return "", fmt.Errorf("rename temp file: %w", err)
 	}
 
+	// Touch the file to trigger Telemt config hot-reload
+	// (rename alone may not fire inotify MODIFY event)
+	now := time.Now()
+	_ = os.Chtimes(configPath, now, now)
+
 	newHash = calculateHash([]byte(content))
 	return newHash, nil
 }

@@ -3,10 +3,13 @@ package proxy
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
+	"time"
 )
 
 type TelemtProxy struct {
@@ -26,6 +29,11 @@ func NewTelemtProxy(targetURL string, authHeader string) (*TelemtProxy, error) {
 		return nil, err
 	}
 
+	tp := &TelemtProxy{
+		targetURL:  targetURL,
+		authHeader: authHeader,
+	}
+
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
 			r.SetURL(target)
@@ -41,6 +49,16 @@ func NewTelemtProxy(targetURL string, authHeader string) (*TelemtProxy, error) {
 
 			r.Out.Header.Del("Cookie")
 		},
+		ModifyResponse: func(resp *http.Response) error {
+			// Touch config after successful mutating requests to /v1/users
+			// so Telemt picks up changes via hot-reload
+			if resp.StatusCode >= 200 && resp.StatusCode < 300 &&
+				strings.Contains(resp.Request.URL.Path, "/v1/users") &&
+				resp.Request.Method != http.MethodGet {
+				go tp.touchConfig()
+			}
+			return nil
+		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadGateway)
@@ -48,11 +66,22 @@ func NewTelemtProxy(targetURL string, authHeader string) (*TelemtProxy, error) {
 		},
 	}
 
-	return &TelemtProxy{
-		handler:    proxy,
-		targetURL:  targetURL,
-		authHeader: authHeader,
-	}, nil
+	tp.handler = proxy
+	return tp, nil
+}
+
+// touchConfig fetches the config path from Telemt and touches the file
+// to trigger hot-reload after user mutations via API.
+func (p *TelemtProxy) touchConfig() {
+	info, err := p.GetSystemInfo()
+	if err != nil {
+		log.Printf("[proxy] touch config: failed to get system info: %v", err)
+		return
+	}
+	now := time.Now()
+	if err := os.Chtimes(info.ConfigPath, now, now); err != nil {
+		log.Printf("[proxy] touch config %s: %v", info.ConfigPath, err)
+	}
 }
 
 func (p *TelemtProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {

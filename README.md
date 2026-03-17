@@ -2,18 +2,24 @@
 
 Web-панель управления для [Telemt](https://github.com/telemt/telemt) MTProxy. Позволяет мониторить состояние сервера, управлять пользователями, отслеживать безопасность и обновлять бинарник — всё через браузер.
 
-**Версия:** 0.1.0
+## Скриншоты
+
+| Dashboard | Users | Runtime |
+|:---------:|:-----:|:-------:|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Users](docs/screenshots/users.png) | ![Runtime](docs/screenshots/runtime.png) |
 
 ## Возможности
 
-- **Dashboard** — здоровье сервера, uptime, количество соединений, статус DC
-- **Пользователи** — создание, редактирование, удаление (CRUD через API Telemt)
-- **Runtime** — события, качество ME, информация об upstream'ах
+- **Dashboard** — здоровье сервера, uptime, соединения, общий трафик, статус DC
+- **Пользователи** — CRUD через API Telemt, сортировка по колонкам, подсветка активных соединений
+- **Runtime** — соединения, ME pool state, ME quality, upstream quality, NAT/STUN, self-test, события
 - **Безопасность** — posture (read-only, whitelist, auth header), лимиты, whitelist
 - **Upstreams** — статус upstream-серверов и пулов
-- **Обновления** — проверка новой версии на GitHub, обновление бинарника в один клик с откатом при ошибке
+- **Обновления** — проверка новой версии на GitHub, обновление бинарника в один клик с откатом при ошибке (Telemt и панель)
 - **TLS** — поддержка custom-сертификатов и автоматического Let's Encrypt (ACME)
+- **GeoIP** — определение геолокации по IP через MaxMind GeoLite2
 - **WebSocket** — реалтайм обновление данных без перезагрузки страницы
+- **Base Path** — поддержка запуска за reverse proxy на подпути
 
 ## Требования
 
@@ -131,17 +137,23 @@ go build -ldflags="-s -w -X main.version=1.2.3" -o telemt-panel .
 | Секция | Параметр | Описание | По умолчанию |
 |--------|----------|----------|-------------|
 | — | `listen` | Адрес и порт | `0.0.0.0:8080` |
+| — | `base_path` | Подпуть для reverse proxy (например `/panel123`) | — |
 | `[telemt]` | `url` | URL API Telemt | **обязательный** |
 | `[telemt]` | `auth_header` | Authorization-заголовок к Telemt API | — |
 | `[telemt]` | `binary_path` | Путь к бинарнику telemt (для обновлений) | `/bin/telemt` |
 | `[telemt]` | `service_name` | Имя systemd-сервиса | `telemt` |
 | `[telemt]` | `github_repo` | GitHub-репозиторий для проверки обновлений | `telemt/telemt` |
+| `[panel]` | `binary_path` | Путь к бинарнику панели (для самообновления) | `/usr/local/bin/telemt-panel` |
+| `[panel]` | `service_name` | Имя systemd-сервиса панели | `telemt-panel` |
+| `[panel]` | `github_repo` | GitHub-репозиторий панели | `amirotin/telemt_panel` |
 | `[auth]` | `username` | Логин администратора | **обязательный** |
 | `[auth]` | `password_hash` | Bcrypt-хеш пароля | **обязательный** |
 | `[auth]` | `jwt_secret` | Секрет для подписи JWT | **обязательный** |
 | `[auth]` | `session_ttl` | Время жизни сессии | `24h` |
 | `[tls]` | `cert_file` / `key_file` | Пользовательские TLS-сертификаты | — |
 | `[tls]` | `acme_domain` | Домен для Let's Encrypt | — |
+| `[tls]` | `acme_cache_dir` | Директория кеша сертификатов | `/var/lib/telemt-panel/certs` |
+| `[geoip]` | `db_path` | Путь к MaxMind GeoLite2 City (.mmdb) | — |
 
 ## Systemd
 
