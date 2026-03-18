@@ -219,7 +219,7 @@ export function QuickSettingsTab({ content, onChange }: QuickSettingsTabProps) {
           <input
             type="checkbox"
             checked={formValues['general.use_middle_proxy'] ?? false}
-            onChange={(e) => handleFieldChange('general.use_middle_proxy', e.target.checked ? true : undefined)}
+            onChange={(e) => handleFieldChange('general.use_middle_proxy', e.target.checked)}
             className="checkbox"
           />
         </Field>
@@ -249,7 +249,7 @@ export function QuickSettingsTab({ content, onChange }: QuickSettingsTabProps) {
           <input
             type="checkbox"
             checked={formValues['general.middle_proxy_nat_probe'] ?? false}
-            onChange={(e) => handleFieldChange('general.middle_proxy_nat_probe', e.target.checked ? true : undefined)}
+            onChange={(e) => handleFieldChange('general.middle_proxy_nat_probe', e.target.checked)}
             className="checkbox"
           />
         </Field>
@@ -275,7 +275,7 @@ export function QuickSettingsTab({ content, onChange }: QuickSettingsTabProps) {
           <input
             type="checkbox"
             checked={formValues['censorship.mask'] ?? false}
-            onChange={(e) => handleFieldChange('censorship.mask', e.target.checked ? true : undefined)}
+            onChange={(e) => handleFieldChange('censorship.mask', e.target.checked)}
             className="checkbox"
           />
         </Field>
@@ -294,7 +294,7 @@ export function QuickSettingsTab({ content, onChange }: QuickSettingsTabProps) {
           <input
             type="checkbox"
             checked={formValues['censorship.tls_emulation'] ?? false}
-            onChange={(e) => handleFieldChange('censorship.tls_emulation', e.target.checked ? true : undefined)}
+            onChange={(e) => handleFieldChange('censorship.tls_emulation', e.target.checked)}
             className="checkbox"
           />
         </Field>
@@ -310,7 +310,7 @@ export function QuickSettingsTab({ content, onChange }: QuickSettingsTabProps) {
           <input
             type="checkbox"
             checked={formValues['network.ipv4'] ?? false}
-            onChange={(e) => handleFieldChange('network.ipv4', e.target.checked ? true : undefined)}
+            onChange={(e) => handleFieldChange('network.ipv4', e.target.checked)}
             className="checkbox"
           />
         </Field>
@@ -319,7 +319,7 @@ export function QuickSettingsTab({ content, onChange }: QuickSettingsTabProps) {
           <input
             type="checkbox"
             checked={formValues['network.ipv6'] ?? false}
-            onChange={(e) => handleFieldChange('network.ipv6', e.target.checked ? true : undefined)}
+            onChange={(e) => handleFieldChange('network.ipv6', e.target.checked)}
             className="checkbox"
           />
         </Field>
