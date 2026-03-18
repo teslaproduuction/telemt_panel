@@ -39,7 +39,13 @@ export function UserFormDialog({ open, onClose, onSubmit, initialData, mode }: U
 
   useEffect(() => {
     if (open) {
-      setForm({ ...emptyForm, ...initialData });
+      const init = { ...emptyForm, ...initialData };
+      // Treat 0 as "not set" for numeric limit fields so the form shows empty
+      // and PATCH will not send 0 (which telemt interprets as "block user")
+      if (init.max_tcp_conns === 0) init.max_tcp_conns = '';
+      if (init.data_quota_bytes === 0) init.data_quota_bytes = '';
+      if (init.max_unique_ips === 0) init.max_unique_ips = '';
+      setForm(init);
       setError('');
     }
   }, [open, initialData]);
@@ -57,14 +63,14 @@ export function UserFormDialog({ open, onClose, onSubmit, initialData, mode }: U
       }
       if (form.secret) payload.secret = form.secret;
       if (form.user_ad_tag) payload.user_ad_tag = form.user_ad_tag;
-      if (form.max_tcp_conns !== '' && form.max_tcp_conns !== undefined) {
+      if (form.max_tcp_conns !== '' && form.max_tcp_conns !== undefined && Number(form.max_tcp_conns) > 0) {
         payload.max_tcp_conns = Number(form.max_tcp_conns);
       }
       if (form.expiration_rfc3339) payload.expiration_rfc3339 = form.expiration_rfc3339;
-      if (form.data_quota_bytes !== '' && form.data_quota_bytes !== undefined) {
+      if (form.data_quota_bytes !== '' && form.data_quota_bytes !== undefined && Number(form.data_quota_bytes) > 0) {
         payload.data_quota_bytes = Number(form.data_quota_bytes);
       }
-      if (form.max_unique_ips !== '' && form.max_unique_ips !== undefined) {
+      if (form.max_unique_ips !== '' && form.max_unique_ips !== undefined && Number(form.max_unique_ips) > 0) {
         payload.max_unique_ips = Number(form.max_unique_ips);
       }
 
