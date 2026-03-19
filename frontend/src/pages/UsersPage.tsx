@@ -271,7 +271,7 @@ export function UsersPage() {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm">{u.active_unique_ips}</span>
-                          {u.max_unique_ips && (
+                          {u.max_unique_ips != null && u.max_unique_ips > 0 && (
                             <span className="text-xs text-text-secondary ml-1">/ {u.max_unique_ips}</span>
                           )}
                         </TableCell>
@@ -371,7 +371,7 @@ export function UsersPage() {
                       <div className="text-text-secondary">Active IPs</div>
                       <div className="mt-1">
                         {u.active_unique_ips}
-                        {u.max_unique_ips && (
+                        {u.max_unique_ips != null && u.max_unique_ips > 0 && (
                           <span className="text-text-secondary ml-1">/ {u.max_unique_ips}</span>
                         )}
                       </div>

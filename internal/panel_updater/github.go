@@ -1,81 +1,48 @@
 package panel_updater
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
 	"runtime"
-	"time"
+	"strings"
+
+	"github.com/telemt/telemt-panel/internal/github"
 )
 
-type GitHubRelease struct {
-	TagName     string        `json:"tag_name"`
-	Name        string        `json:"name"`
-	Body        string        `json:"body"`
-	HTMLURL     string        `json:"html_url"`
-	PublishedAt time.Time     `json:"published_at"`
-	Prerelease  bool          `json:"prerelease"`
-	Draft       bool          `json:"draft"`
-	Assets      []GitHubAsset `json:"assets"`
-}
-
-type GitHubAsset struct {
-	Name               string `json:"name"`
-	BrowserDownloadURL string `json:"browser_download_url"`
-	Size               int64  `json:"size"`
-}
-
-var httpClient = &http.Client{Timeout: 30 * time.Second}
-
-func FetchLatestRelease(repo string) (*GitHubRelease, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("github request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("github returned status %d", resp.StatusCode)
-	}
-
-	var release GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return nil, fmt.Errorf("decode release: %w", err)
-	}
-
-	return &release, nil
-}
-
 func archString() string {
-	switch runtime.GOARCH {
-	case "arm64":
+	if runtime.GOARCH == "arm64" {
 		return "aarch64"
-	default:
-		return "x86_64"
 	}
+	return "x86_64"
 }
 
 func AssetName() string {
-	return fmt.Sprintf("telemt-panel-%s-linux-gnu.tar.gz", archString())
+	return "telemt-panel-" + archString() + "-linux-gnu.tar.gz"
 }
 
 func Sha256AssetName() string {
-	return fmt.Sprintf("telemt-panel-%s-linux-gnu.sha256", archString())
+	return "telemt-panel-" + archString() + "-linux-gnu.sha256"
 }
 
-func FindAsset(release *GitHubRelease, name string) (*GitHubAsset, bool) {
-	for i := range release.Assets {
-		if release.Assets[i].Name == name {
-			return &release.Assets[i], true
+func NewAssetMatcher() github.AssetMatcher {
+	binaryName := AssetName()
+	checksumName := Sha256AssetName()
+	return func(assets []github.GitHubAsset) (*github.GitHubAsset, *github.GitHubAsset) {
+		var bin, sum *github.GitHubAsset
+		for i := range assets {
+			if assets[i].Name == binaryName {
+				bin = &assets[i]
+			}
+			if assets[i].Name == checksumName {
+				sum = &assets[i]
+			}
 		}
+		return bin, sum
 	}
-	return nil, false
+}
+
+func splitOwnerRepo(repo string) (string, string) {
+	parts := strings.SplitN(repo, "/", 2)
+	if len(parts) != 2 {
+		return "", repo
+	}
+	return parts[0], parts[1]
 }

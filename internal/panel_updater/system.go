@@ -12,7 +12,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 func DownloadFile(url string) (string, error) {
 	req, err := http.NewRequest("GET", url, nil)

@@ -6,16 +6,6 @@ import { panelApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { RefreshCw, Download, CheckCircle2, XCircle, Loader2, ArrowRight } from 'lucide-react';
 
-interface CheckResult {
-  current_version: string;
-  latest_version: string;
-  update_available: boolean;
-  release_name: string;
-  release_url: string;
-  published_at: string;
-  changelog: string;
-}
-
 interface UpdateStatus {
   phase: string;
   message?: string;
@@ -23,50 +13,213 @@ interface UpdateStatus {
   log?: string[];
 }
 
+interface ReleaseInfo {
+  version: string;
+  name: string;
+  changelog: string;
+  published_at: string;
+  html_url: string;
+  prerelease: boolean;
+  is_downgrade: boolean;
+  asset_url: string;
+  asset_size: number;
+  checksum_url: string;
+}
+
+interface ReleasesResult {
+  current_version: string;
+  releases: ReleaseInfo[];
+}
+
 const PHASE_STEPS = ['checking', 'downloading', 'verifying', 'replacing', 'restarting'];
+
+function VersionSelect({
+  releases,
+  selected,
+  onSelect,
+  loading,
+  error,
+  onRetry,
+  currentVersion,
+}: {
+  releases: ReleaseInfo[];
+  selected: ReleaseInfo | null;
+  onSelect: (r: ReleaseInfo) => void;
+  loading: boolean;
+  error: string;
+  onRetry: () => void;
+  currentVersion: string;
+}) {
+  if (loading) {
+    return <div className="text-sm text-gray-400">Загрузка релизов...</div>;
+  }
+  if (error) {
+    return (
+      <div className="text-sm text-red-400">
+        {error}{' '}
+        <button onClick={onRetry} className="underline hover:text-red-300">
+          Повторить
+        </button>
+      </div>
+    );
+  }
+  if (releases.length === 0) {
+    return <div className="text-sm text-gray-400">Нет доступных версий</div>;
+  }
+  return (
+    <select
+      className="bg-gray-700 text-white rounded px-3 py-1.5 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+      value={selected?.version || ''}
+      onChange={(e) => {
+        const r = releases.find((r) => r.version === e.target.value);
+        if (r) onSelect(r);
+      }}
+    >
+      <option value="" disabled>
+        Выберите версию
+      </option>
+      {currentVersion && (
+        <option value="__current__" disabled>
+          {currentVersion} (текущая)
+        </option>
+      )}
+      {releases.map((r) => (
+        <option key={r.version} value={r.version}>
+          {r.version}
+          {r.prerelease ? ' ⚠ pre-release' : ''}
+          {r.is_downgrade ? ' ↓ downgrade' : ''}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function ConfirmModal({
+  release,
+  onConfirm,
+  onCancel,
+}: {
+  release: ReleaseInfo;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const warnings: string[] = [];
+  if (release.prerelease) {
+    warnings.push(`Это pre-release версия ${release.version}. Она может быть нестабильной.`);
+  }
+  if (release.is_downgrade) {
+    warnings.push(`Вы собираетесь откатиться на более старую версию ${release.version}.`);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gray-800 rounded-lg p-6 max-w-md mx-4 border border-gray-700">
+        <h3 className="text-lg font-semibold text-white mb-4">Подтверждение</h3>
+        {warnings.map((w, i) => (
+          <p key={i} className="text-yellow-400 text-sm mb-2">{w}</p>
+        ))}
+        <p className="text-gray-300 text-sm mt-4">Продолжить установку?</p>
+        <div className="flex gap-3 mt-6 justify-end">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-500 text-sm"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded bg-yellow-600 text-white hover:bg-yellow-500 text-sm"
+          >
+            Продолжить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function UpdatePage() {
   // Telemt update state
-  const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
+  const [currentVersion, setCurrentVersion] = useState('');
   const [status, setStatus] = useState<UpdateStatus | null>(null);
-  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Panel update state
-  const [panelCheckResult, setPanelCheckResult] = useState<CheckResult | null>(null);
+  const [panelCurrentVersion, setPanelCurrentVersion] = useState('');
   const [panelStatus, setPanelStatus] = useState<UpdateStatus | null>(null);
-  const [panelChecking, setPanelChecking] = useState(false);
   const [panelError, setPanelError] = useState<string | null>(null);
   const panelPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Telemt releases
+  const [releases, setReleases] = useState<ReleaseInfo[]>([]);
+  const [selectedRelease, setSelectedRelease] = useState<ReleaseInfo | null>(null);
+  const [releasesLoading, setReleasesLoading] = useState(false);
+  const [releasesError, setReleasesError] = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // Panel releases
+  const [panelReleases, setPanelReleases] = useState<ReleaseInfo[]>([]);
+  const [panelSelectedRelease, setPanelSelectedRelease] = useState<ReleaseInfo | null>(null);
+  const [panelReleasesLoading, setPanelReleasesLoading] = useState(false);
+  const [panelReleasesError, setPanelReleasesError] = useState('');
+  const [panelShowConfirm, setPanelShowConfirm] = useState(false);
 
   const isUpdating = status && !['idle', 'done', 'error'].includes(status.phase);
   const isPanelUpdating = panelStatus && !['idle', 'done', 'error'].includes(panelStatus.phase);
 
-  // Telemt update functions
-  async function handleCheck() {
-    setChecking(true);
-    setError(null);
+  // Fetch releases functions
+  const fetchReleases = async () => {
+    setReleasesLoading(true);
+    setReleasesError('');
     try {
-      const result = await panelApi.get<CheckResult>('/update/check');
-      setCheckResult(result);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to check for updates');
+      const res = await panelApi.get<ReleasesResult>('/update/releases');
+      setCurrentVersion(res.current_version || '');
+      setReleases(res.releases || []);
+      const defaultRelease = (res.releases || []).find(r => !r.prerelease && !r.is_downgrade);
+      setSelectedRelease(defaultRelease || null);
+    } catch (e: any) {
+      setReleasesError(e.message || 'Ошибка загрузки релизов');
     } finally {
-      setChecking(false);
+      setReleasesLoading(false);
     }
-  }
+  };
 
-  async function handleApply() {
-    setError(null);
+  const fetchPanelReleases = async () => {
+    setPanelReleasesLoading(true);
+    setPanelReleasesError('');
     try {
-      const s = await panelApi.post<UpdateStatus>('/update/apply');
-      setStatus(s);
-      startPolling();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to start update');
+      const res = await panelApi.get<ReleasesResult>('/panel/update/releases');
+      setPanelCurrentVersion(res.current_version || '');
+      setPanelReleases(res.releases || []);
+      const defaultRelease = (res.releases || []).find(r => !r.prerelease && !r.is_downgrade);
+      setPanelSelectedRelease(defaultRelease || null);
+    } catch (e: any) {
+      setPanelReleasesError(e.message || 'Ошибка загрузки релизов');
+    } finally {
+      setPanelReleasesLoading(false);
     }
-  }
+  };
+
+  // Telemt update functions
+  const handleApply = async () => {
+    if (!selectedRelease) return;
+    if (selectedRelease.prerelease || selectedRelease.is_downgrade) {
+      setShowConfirm(true);
+      return;
+    }
+    doApply();
+  };
+
+  const doApply = async () => {
+    setShowConfirm(false);
+    try {
+      await panelApi.post('/update/apply', { version: selectedRelease?.version });
+      startPolling();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
 
   function startPolling() {
     stopPolling();
@@ -77,10 +230,7 @@ export function UpdatePage() {
         if (s.phase === 'done' || s.phase === 'error') {
           stopPolling();
           if (s.phase === 'done') {
-            try {
-              const result = await panelApi.get<CheckResult>('/update/check');
-              setCheckResult(result);
-            } catch { /* ignore */ }
+            fetchReleases();
           }
         }
       } catch {
@@ -97,29 +247,24 @@ export function UpdatePage() {
   }
 
   // Panel update functions
-  async function handlePanelCheck() {
-    setPanelChecking(true);
-    setPanelError(null);
-    try {
-      const result = await panelApi.get<CheckResult>('/panel/update/check');
-      setPanelCheckResult(result);
-    } catch (e: unknown) {
-      setPanelError(e instanceof Error ? e.message : 'Failed to check for panel updates');
-    } finally {
-      setPanelChecking(false);
+  const handlePanelApply = async () => {
+    if (!panelSelectedRelease) return;
+    if (panelSelectedRelease.prerelease || panelSelectedRelease.is_downgrade) {
+      setPanelShowConfirm(true);
+      return;
     }
-  }
+    doPanelApply();
+  };
 
-  async function handlePanelApply() {
-    setPanelError(null);
+  const doPanelApply = async () => {
+    setPanelShowConfirm(false);
     try {
-      const s = await panelApi.post<UpdateStatus>('/panel/update/apply');
-      setPanelStatus(s);
+      await panelApi.post('/panel/update/apply', { version: panelSelectedRelease?.version });
       startPanelPolling();
-    } catch (e: unknown) {
-      setPanelError(e instanceof Error ? e.message : 'Failed to start panel update');
+    } catch (e: any) {
+      setPanelError(e.message);
     }
-  }
+  };
 
   function startPanelPolling() {
     stopPanelPolling();
@@ -130,10 +275,7 @@ export function UpdatePage() {
         if (s.phase === 'done' || s.phase === 'error') {
           stopPanelPolling();
           if (s.phase === 'done') {
-            try {
-              const result = await panelApi.get<CheckResult>('/panel/update/check');
-              setPanelCheckResult(result);
-            } catch { /* ignore */ }
+            fetchPanelReleases();
           }
         }
       } catch {
@@ -150,6 +292,8 @@ export function UpdatePage() {
   }
 
   useEffect(() => {
+    fetchReleases();
+    fetchPanelReleases();
     return () => {
       stopPolling();
       stopPanelPolling();
@@ -161,7 +305,7 @@ export function UpdatePage() {
 
   return (
     <div className="min-h-screen">
-      <Header title="Update" onRefresh={() => { handleCheck(); handlePanelCheck(); }} />
+      <Header title="Update" onRefresh={() => { fetchReleases(); fetchPanelReleases(); }} />
       <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 max-w-3xl">
 
         {/* Panel Update Section */}
@@ -169,86 +313,92 @@ export function UpdatePage() {
           <div className="flex items-center justify-between mb-3 lg:mb-4">
             <h2 className="text-xs lg:text-sm font-semibold text-text-primary">Panel Version</h2>
             <button
-              onClick={handlePanelCheck}
-              disabled={panelChecking || !!isPanelUpdating}
+              onClick={fetchPanelReleases}
+              disabled={panelReleasesLoading || !!isPanelUpdating}
               className={cn(
                 'flex items-center gap-1.5 lg:gap-2 px-2.5 lg:px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
                 'bg-accent/15 text-accent hover:bg-accent/25',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
-              <RefreshCw size={12} className={cn('lg:w-3.5 lg:h-3.5', panelChecking && 'animate-spin')} />
-              <span className="hidden sm:inline">Check for updates</span>
-              <span className="sm:hidden">Check</span>
+              <RefreshCw size={12} className={cn('lg:w-3.5 lg:h-3.5', panelReleasesLoading && 'animate-spin')} />
+              <span className="hidden sm:inline">Refresh releases</span>
+              <span className="sm:hidden">Refresh</span>
             </button>
           </div>
 
           {panelError && <ErrorAlert message={panelError} />}
 
-          {panelCheckResult ? (
-            <div className="space-y-3 lg:space-y-4">
-              <div className="grid grid-cols-2 gap-2 lg:gap-3">
-                <MetricCard label="Current Version" value={panelCheckResult.current_version} />
-                <MetricCard label="Latest Version" value={panelCheckResult.latest_version} />
+          <div className="space-y-3 lg:space-y-4">
+            <div className="grid grid-cols-2 gap-2 lg:gap-3">
+              <MetricCard label="Current Version" value={panelCurrentVersion || '—'} />
+              <div>
+                <VersionSelect
+                  releases={panelReleases}
+                  selected={panelSelectedRelease}
+                  onSelect={setPanelSelectedRelease}
+                  loading={panelReleasesLoading}
+                  error={panelReleasesError}
+                  onRetry={fetchPanelReleases}
+                  currentVersion={panelCurrentVersion}
+                />
               </div>
-
-              {panelCheckResult.update_available ? (
-                <div className="bg-accent/10 border border-accent/30 rounded-md p-3 lg:p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs lg:text-sm font-medium text-accent">
-                        Update available: {panelCheckResult.release_name}
-                      </p>
-                      <p className="text-xs text-text-secondary mt-1">
-                        Published {new Date(panelCheckResult.published_at).toLocaleDateString()}
-                        {' · '}
-                        <a
-                          href={panelCheckResult.release_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-accent hover:underline"
-                        >
-                          Release notes
-                        </a>
-                      </p>
-                    </div>
-                    <button
-                      onClick={handlePanelApply}
-                      disabled={!!isPanelUpdating}
-                      className={cn(
-                        'flex items-center justify-center gap-2 px-3 lg:px-4 py-2 rounded-md text-xs lg:text-sm font-medium transition-colors w-full sm:w-auto',
-                        'bg-accent text-white hover:bg-accent/90',
-                        'disabled:opacity-50 disabled:cursor-not-allowed'
-                      )}
-                    >
-                      <Download size={14} className="lg:w-4 lg:h-4" />
-                      Update
-                    </button>
-                  </div>
-
-                  {panelCheckResult.changelog && (
-                    <details className="mt-3">
-                      <summary className="text-xs text-text-secondary cursor-pointer hover:text-text-primary">
-                        Changelog
-                      </summary>
-                      <pre className="mt-2 text-xs text-text-secondary whitespace-pre-wrap bg-background rounded p-2 lg:p-3 max-h-48 overflow-y-auto">
-                        {panelCheckResult.changelog}
-                      </pre>
-                    </details>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-xs lg:text-sm text-success">
-                  <CheckCircle2 size={14} className="lg:w-4 lg:h-4" />
-                  You are running the latest version
-                </div>
-              )}
             </div>
-          ) : (
-            <p className="text-xs lg:text-sm text-text-secondary">
-              Click "Check for updates" to see if a new version is available.
-            </p>
-          )}
+
+            {panelSelectedRelease && (
+              <div className="bg-accent/10 border border-accent/30 rounded-md p-3 lg:p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs lg:text-sm font-medium text-accent">
+                      {panelSelectedRelease.name}
+                    </p>
+                    <p className="text-xs text-text-secondary mt-1">
+                      Published {new Date(panelSelectedRelease.published_at).toLocaleDateString()}
+                      {' · '}
+                      <a
+                        href={panelSelectedRelease.html_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent hover:underline"
+                      >
+                        Release notes
+                      </a>
+                    </p>
+                  </div>
+                  <button
+                    onClick={handlePanelApply}
+                    disabled={!panelSelectedRelease || !!isPanelUpdating}
+                    className={cn(
+                      'flex items-center justify-center gap-2 px-3 lg:px-4 py-2 rounded-md text-xs lg:text-sm font-medium transition-colors w-full sm:w-auto',
+                      'bg-accent text-white hover:bg-accent/90',
+                      'disabled:opacity-50 disabled:cursor-not-allowed'
+                    )}
+                  >
+                    <Download size={14} className="lg:w-4 lg:h-4" />
+                    Update
+                  </button>
+                </div>
+
+                {panelSelectedRelease.changelog && (
+                  <details className="mt-3">
+                    <summary className="text-xs text-text-secondary cursor-pointer hover:text-text-primary">
+                      Changelog
+                    </summary>
+                    <pre className="mt-2 text-xs text-text-secondary whitespace-pre-wrap bg-background rounded p-2 lg:p-3 max-h-48 overflow-y-auto">
+                      {panelSelectedRelease.changelog}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {!panelSelectedRelease && !panelReleasesLoading && panelReleases.length === 0 && !panelReleasesError && (
+              <div className="flex items-center gap-2 text-xs lg:text-sm text-success">
+                <CheckCircle2 size={14} className="lg:w-4 lg:h-4" />
+                You are running the latest version
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Panel Update Progress */}
@@ -340,84 +490,90 @@ export function UpdatePage() {
           <div className="flex items-center justify-between mb-3 lg:mb-4">
             <h2 className="text-xs lg:text-sm font-semibold text-text-primary">Telemt Version</h2>
             <button
-              onClick={handleCheck}
-              disabled={checking || !!isUpdating}
+              onClick={fetchReleases}
+              disabled={releasesLoading || !!isUpdating}
               className={cn(
                 'flex items-center gap-1.5 lg:gap-2 px-2.5 lg:px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
                 'bg-accent/15 text-accent hover:bg-accent/25',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
-              <RefreshCw size={12} className={cn('lg:w-3.5 lg:h-3.5', checking && 'animate-spin')} />
-              <span className="hidden sm:inline">Check for updates</span>
-              <span className="sm:hidden">Check</span>
+              <RefreshCw size={12} className={cn('lg:w-3.5 lg:h-3.5', releasesLoading && 'animate-spin')} />
+              <span className="hidden sm:inline">Refresh releases</span>
+              <span className="sm:hidden">Refresh</span>
             </button>
           </div>
 
-          {checkResult ? (
-            <div className="space-y-3 lg:space-y-4">
-              <div className="grid grid-cols-2 gap-2 lg:gap-3">
-                <MetricCard label="Current Version" value={checkResult.current_version} />
-                <MetricCard label="Latest Version" value={checkResult.latest_version} />
+          <div className="space-y-3 lg:space-y-4">
+            <div className="grid grid-cols-2 gap-2 lg:gap-3">
+              <MetricCard label="Current Version" value={currentVersion || '—'} />
+              <div>
+                <VersionSelect
+                  releases={releases}
+                  selected={selectedRelease}
+                  onSelect={setSelectedRelease}
+                  loading={releasesLoading}
+                  error={releasesError}
+                  onRetry={fetchReleases}
+                  currentVersion={currentVersion}
+                />
               </div>
-
-              {checkResult.update_available ? (
-                <div className="bg-accent/10 border border-accent/30 rounded-md p-3 lg:p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs lg:text-sm font-medium text-accent">
-                        Update available: {checkResult.release_name}
-                      </p>
-                      <p className="text-xs text-text-secondary mt-1">
-                        Published {new Date(checkResult.published_at).toLocaleDateString()}
-                        {' · '}
-                        <a
-                          href={checkResult.release_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-accent hover:underline"
-                        >
-                          Release notes
-                        </a>
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleApply}
-                      disabled={!!isUpdating}
-                      className={cn(
-                        'flex items-center justify-center gap-2 px-3 lg:px-4 py-2 rounded-md text-xs lg:text-sm font-medium transition-colors w-full sm:w-auto',
-                        'bg-accent text-white hover:bg-accent/90',
-                        'disabled:opacity-50 disabled:cursor-not-allowed'
-                      )}
-                    >
-                      <Download size={14} className="lg:w-4 lg:h-4" />
-                      Update
-                    </button>
-                  </div>
-
-                  {checkResult.changelog && (
-                    <details className="mt-3">
-                      <summary className="text-xs text-text-secondary cursor-pointer hover:text-text-primary">
-                        Changelog
-                      </summary>
-                      <pre className="mt-2 text-xs text-text-secondary whitespace-pre-wrap bg-background rounded p-2 lg:p-3 max-h-48 overflow-y-auto">
-                        {checkResult.changelog}
-                      </pre>
-                    </details>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-xs lg:text-sm text-success">
-                  <CheckCircle2 size={14} className="lg:w-4 lg:h-4" />
-                  You are running the latest version
-                </div>
-              )}
             </div>
-          ) : (
-            <p className="text-xs lg:text-sm text-text-secondary">
-              Click "Check for updates" to see if a new version is available.
-            </p>
-          )}
+
+            {selectedRelease && (
+              <div className="bg-accent/10 border border-accent/30 rounded-md p-3 lg:p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs lg:text-sm font-medium text-accent">
+                      {selectedRelease.name}
+                    </p>
+                    <p className="text-xs text-text-secondary mt-1">
+                      Published {new Date(selectedRelease.published_at).toLocaleDateString()}
+                      {' · '}
+                      <a
+                        href={selectedRelease.html_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent hover:underline"
+                      >
+                        Release notes
+                      </a>
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleApply}
+                    disabled={!selectedRelease || !!isUpdating}
+                    className={cn(
+                      'flex items-center justify-center gap-2 px-3 lg:px-4 py-2 rounded-md text-xs lg:text-sm font-medium transition-colors w-full sm:w-auto',
+                      'bg-accent text-white hover:bg-accent/90',
+                      'disabled:opacity-50 disabled:cursor-not-allowed'
+                    )}
+                  >
+                    <Download size={14} className="lg:w-4 lg:h-4" />
+                    Update
+                  </button>
+                </div>
+
+                {selectedRelease.changelog && (
+                  <details className="mt-3">
+                    <summary className="text-xs text-text-secondary cursor-pointer hover:text-text-primary">
+                      Changelog
+                    </summary>
+                    <pre className="mt-2 text-xs text-text-secondary whitespace-pre-wrap bg-background rounded p-2 lg:p-3 max-h-48 overflow-y-auto">
+                      {selectedRelease.changelog}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {!selectedRelease && !releasesLoading && releases.length === 0 && !releasesError && (
+              <div className="flex items-center gap-2 text-xs lg:text-sm text-success">
+                <CheckCircle2 size={14} className="lg:w-4 lg:h-4" />
+                You are running the latest version
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Update Progress */}
@@ -500,6 +656,22 @@ export function UpdatePage() {
               </details>
             )}
           </div>
+        )}
+
+        {/* Confirm Modals */}
+        {showConfirm && selectedRelease && (
+          <ConfirmModal
+            release={selectedRelease}
+            onConfirm={doApply}
+            onCancel={() => setShowConfirm(false)}
+          />
+        )}
+        {panelShowConfirm && panelSelectedRelease && (
+          <ConfirmModal
+            release={panelSelectedRelease}
+            onConfirm={doPanelApply}
+            onCancel={() => setPanelShowConfirm(false)}
+          />
         )}
       </div>
     </div>

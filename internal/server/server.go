@@ -196,6 +196,8 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		s.cfg.Telemt.ServiceName,
 		s.cfg.Telemt.GithubRepo,
 		s.cfg.Telemt.AuthHeader,
+		s.cfg.Panel.MaxNewerReleases,
+		s.cfg.Panel.MaxOlderReleases,
 	)
 
 	mux.Handle("GET /api/update/check", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -207,9 +209,24 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: result})
 	})))
 
+	mux.Handle("GET /api/update/releases", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result, err := upd.Releases()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "RELEASES_ERROR", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: result})
+	})))
+
 	mux.Handle("POST /api/update/apply", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := upd.Apply(); err != nil {
-			writeError(w, http.StatusConflict, "update_in_progress", err.Error())
+		var req struct {
+			Version string `json:"version"`
+		}
+		// Body is optional — ignore decode errors for backward compat
+		json.NewDecoder(r.Body).Decode(&req)
+
+		if err := upd.Apply(req.Version); err != nil {
+			writeError(w, http.StatusConflict, "UPDATE_IN_PROGRESS", err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: upd.GetStatus()})
@@ -225,6 +242,8 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		s.cfg.Panel.BinaryPath,
 		s.cfg.Panel.ServiceName,
 		s.cfg.Panel.GithubRepo,
+		s.cfg.Panel.MaxNewerReleases,
+		s.cfg.Panel.MaxOlderReleases,
 	)
 
 	mux.Handle("GET /api/panel/update/check", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -236,9 +255,23 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: result})
 	})))
 
+	mux.Handle("GET /api/panel/update/releases", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result, err := panelUpd.Releases()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "RELEASES_ERROR", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: result})
+	})))
+
 	mux.Handle("POST /api/panel/update/apply", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := panelUpd.Apply(); err != nil {
-			writeError(w, http.StatusConflict, "update_in_progress", err.Error())
+		var req struct {
+			Version string `json:"version"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+
+		if err := panelUpd.Apply(req.Version); err != nil {
+			writeError(w, http.StatusConflict, "UPDATE_IN_PROGRESS", err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: panelUpd.GetStatus()})

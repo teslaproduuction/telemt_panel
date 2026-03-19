@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -125,8 +126,11 @@ func QuickUpdate(configPath string, updates map[string]interface{}) (newHash str
 		return "", fmt.Errorf("marshal config: %w", err)
 	}
 
+	// Remove underscores from integer literals (go-toml/v2 formats 8443 as 8_443)
+	cleaned := removeIntegerUnderscores(string(newContent))
+
 	// Save
-	return SaveConfig(configPath, string(newContent))
+	return SaveConfig(configPath, cleaned)
 }
 
 // Helper: set nested key like "server.port" = 443
@@ -167,6 +171,17 @@ func deleteNestedKey(m map[string]interface{}, key string) {
 	}
 
 	delete(current, parts[len(parts)-1])
+}
+
+var reDigitUnderscore = regexp.MustCompile(`(\d)_(\d)`)
+
+// removeIntegerUnderscores strips underscores from TOML integer literals
+// (e.g. 8_443 → 8443). Applied repeatedly to handle 1_000_000 → 1000000.
+func removeIntegerUnderscores(s string) string {
+	for reDigitUnderscore.MatchString(s) {
+		s = reDigitUnderscore.ReplaceAllString(s, "${1}${2}")
+	}
+	return s
 }
 
 func createBackup(src, dst string) error {

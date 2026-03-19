@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/telemt/telemt-panel/internal/github"
 )
 
 type Phase string
@@ -43,16 +45,23 @@ type CheckResult struct {
 }
 
 type Updater struct {
-	mu          sync.Mutex
-	status      Status
-	telemtURL   string
-	binaryPath  string
-	serviceName string
-	githubRepo  string
-	authHeader  string
+	mu             sync.Mutex
+	status         Status
+	telemtURL      string
+	binaryPath     string
+	serviceName    string
+	githubRepo     string
+	authHeader     string
+	releaseLimits  github.ReleaseLimits
 }
 
-func New(telemtURL, binaryPath, serviceName, githubRepo, authHeader string) *Updater {
+func New(telemtURL, binaryPath, serviceName, githubRepo, authHeader string, maxNewer, maxOlder int) *Updater {
+	if maxNewer <= 0 {
+		maxNewer = github.DefaultMaxNewerReleases
+	}
+	if maxOlder <= 0 {
+		maxOlder = github.DefaultMaxOlderReleases
+	}
 	return &Updater{
 		status:      Status{Phase: PhaseIdle},
 		telemtURL:   telemtURL,
@@ -60,6 +69,7 @@ func New(telemtURL, binaryPath, serviceName, githubRepo, authHeader string) *Upd
 		serviceName: serviceName,
 		githubRepo:  githubRepo,
 		authHeader:  authHeader,
+		releaseLimits: github.ReleaseLimits{MaxNewer: maxNewer, MaxOlder: maxOlder},
 	}
 }
 
@@ -162,30 +172,44 @@ func truncate(b []byte, max int) string {
 }
 
 func (u *Updater) Check() (*CheckResult, error) {
-	currentVersion, err := u.fetchCurrentVersion()
+	result, err := u.Releases()
 	if err != nil {
-		return nil, fmt.Errorf("get current version: %w", err)
+		return nil, err
 	}
 
-	release, err := FetchLatestRelease(u.githubRepo)
-	if err != nil {
-		return nil, fmt.Errorf("fetch latest release: %w", err)
+	cr := &CheckResult{
+		CurrentVersion:  result.CurrentVersion,
+		UpdateAvailable: false,
+	}
+	for _, r := range result.Releases {
+		if !r.Prerelease && !r.IsDowngrade {
+			cr.LatestVersion = r.Version
+			cr.UpdateAvailable = true
+			cr.ReleaseName = r.Name
+			cr.ReleaseURL = r.HTMLURL
+			cr.PublishedAt = r.PublishedAt
+			cr.Changelog = r.Changelog
+			break
+		}
+	}
+	if !cr.UpdateAvailable {
+		cr.LatestVersion = result.CurrentVersion
 	}
 
-	latestVersion := strings.TrimPrefix(release.TagName, "v")
-
-	return &CheckResult{
-		CurrentVersion:  currentVersion,
-		LatestVersion:   latestVersion,
-		UpdateAvailable: latestVersion != currentVersion,
-		ReleaseName:     release.Name,
-		ReleaseURL:      release.HTMLURL,
-		PublishedAt:     release.PublishedAt.Format(time.RFC3339),
-		Changelog:       release.Body,
-	}, nil
+	return cr, nil
 }
 
-func (u *Updater) Apply() error {
+// Releases returns a list of available releases relative to the current version.
+func (u *Updater) Releases() (*github.ReleasesResult, error) {
+	currentVersion, err := u.fetchCurrentVersion()
+	if err != nil {
+		return nil, fmt.Errorf("fetch current version: %w", err)
+	}
+	owner, repo := splitOwnerRepo(u.githubRepo)
+	return github.FetchReleases(owner, repo, currentVersion, NewAssetMatcher(), u.releaseLimits)
+}
+
+func (u *Updater) Apply(version string) error {
 	u.mu.Lock()
 	if u.status.Phase != PhaseIdle && u.status.Phase != PhaseDone && u.status.Phase != PhaseError {
 		u.mu.Unlock()
@@ -195,44 +219,56 @@ func (u *Updater) Apply() error {
 	u.status = Status{Phase: PhaseIdle}
 	u.mu.Unlock()
 
-	go u.applyAsync()
+	go u.applyAsync(version)
 	return nil
 }
 
-func (u *Updater) applyAsync() {
+func (u *Updater) applyAsync(version string) {
 	u.appendLog(fmt.Sprintf("config: binary_path=%s, service=%s, repo=%s", u.binaryPath, u.serviceName, u.githubRepo))
 	u.appendLog(fmt.Sprintf("arch: asset=%s", AssetName()))
 
-	u.setStatus(PhaseChecking, "fetching latest release")
+	u.setStatus(PhaseChecking, "fetching current version")
 
-	release, err := FetchLatestRelease(u.githubRepo)
+	currentVersion, err := u.fetchCurrentVersion()
+	if err != nil {
+		u.setError(fmt.Errorf("fetch current version: %w", err))
+		return
+	}
+	u.appendLog(fmt.Sprintf("current version: %s", currentVersion))
+
+	// Fetch the target release
+	owner, repoName := splitOwnerRepo(u.githubRepo)
+	var release *github.ReleaseInfo
+	if version != "" {
+		u.appendLog(fmt.Sprintf("Fetching release %s...", version))
+		release, err = github.FetchRelease(owner, repoName, version, NewAssetMatcher())
+	} else {
+		u.appendLog("Fetching latest release...")
+		var result *github.ReleasesResult
+		result, err = github.FetchReleases(owner, repoName, currentVersion, NewAssetMatcher(), u.releaseLimits)
+		if err == nil {
+			// Find latest non-prerelease
+			for i := range result.Releases {
+				if !result.Releases[i].Prerelease && !result.Releases[i].IsDowngrade {
+					release = &result.Releases[i]
+					break
+				}
+			}
+			if release == nil {
+				err = fmt.Errorf("no stable release found newer than %s", currentVersion)
+			}
+		}
+	}
 	if err != nil {
 		u.setError(fmt.Errorf("fetch release: %w", err))
 		return
 	}
-	u.appendLog(fmt.Sprintf("latest release: %s (%s)", release.TagName, release.Name))
-
-	tarAsset, ok := FindAsset(release, AssetName())
-	if !ok {
-		available := make([]string, len(release.Assets))
-		for i, a := range release.Assets {
-			available[i] = a.Name
-		}
-		u.setError(fmt.Errorf("asset %s not found in release %s (available: %v)", AssetName(), release.TagName, available))
-		return
-	}
-	u.appendLog(fmt.Sprintf("tarball: %s (%d bytes)", tarAsset.Name, tarAsset.Size))
-
-	shaAsset, ok := FindAsset(release, Sha256AssetName())
-	if !ok {
-		u.setError(fmt.Errorf("checksum asset %s not found", Sha256AssetName()))
-		return
-	}
+	u.appendLog(fmt.Sprintf("target release: %s (%s)", release.Version, release.Name))
 
 	// Download sha256
 	u.setStatus(PhaseDownloading, "downloading checksum")
-	u.appendLog(fmt.Sprintf("downloading sha256 from %s", shaAsset.BrowserDownloadURL))
-	shaPath, err := DownloadFile(shaAsset.BrowserDownloadURL)
+	u.appendLog(fmt.Sprintf("downloading sha256 from %s", release.ChecksumURL))
+	shaPath, err := DownloadFile(release.ChecksumURL)
 	if err != nil {
 		u.setError(fmt.Errorf("download checksum: %w", err))
 		return
@@ -248,9 +284,9 @@ func (u *Updater) applyAsync() {
 	u.appendLog(fmt.Sprintf("expected sha256: %s", strings.TrimSpace(string(shaBytes))))
 
 	// Download tarball
-	u.setStatus(PhaseDownloading, fmt.Sprintf("downloading %s (%d MB)", tarAsset.Name, tarAsset.Size/1024/1024))
-	u.appendLog(fmt.Sprintf("downloading tarball from %s", tarAsset.BrowserDownloadURL))
-	tarPath, err := DownloadFile(tarAsset.BrowserDownloadURL)
+	u.setStatus(PhaseDownloading, fmt.Sprintf("downloading %s (%d MB)", AssetName(), release.AssetSize/1024/1024))
+	u.appendLog(fmt.Sprintf("downloading tarball from %s", release.AssetURL))
+	tarPath, err := DownloadFile(release.AssetURL)
 	if err != nil {
 		os.Remove(shaPath)
 		u.setError(fmt.Errorf("download tarball: %w", err))
@@ -345,7 +381,7 @@ func (u *Updater) applyAsync() {
 	newVersion, err := u.fetchCurrentVersion()
 	if err != nil {
 		u.appendLog(fmt.Sprintf("version check after update failed: %s", err))
-		u.setStatus(PhaseDone, fmt.Sprintf("binary replaced with %s (version verification failed: %s)", release.TagName, err))
+		u.setStatus(PhaseDone, fmt.Sprintf("binary replaced with %s (version verification failed: %s)", release.Version, err))
 		return
 	}
 

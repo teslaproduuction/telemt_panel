@@ -7,7 +7,8 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
+
+	"github.com/telemt/telemt-panel/internal/github"
 )
 
 type Phase string
@@ -47,6 +48,7 @@ type Updater struct {
 	binaryPath     string
 	serviceName    string
 	githubRepo     string
+	releaseLimits  github.ReleaseLimits
 }
 
 const statusFilePath = "/tmp/telemt-panel-update-status.json"
@@ -84,13 +86,20 @@ func (u *Updater) loadStatusFromFile() {
 	os.Remove(statusFilePath)
 }
 
-func New(currentVersion, binaryPath, serviceName, githubRepo string) *Updater {
+func New(currentVersion, binaryPath, serviceName, githubRepo string, maxNewer, maxOlder int) *Updater {
+	if maxNewer <= 0 {
+		maxNewer = github.DefaultMaxNewerReleases
+	}
+	if maxOlder <= 0 {
+		maxOlder = github.DefaultMaxOlderReleases
+	}
 	u := &Updater{
 		status:         Status{Phase: PhaseIdle},
 		currentVersion: currentVersion,
 		binaryPath:     binaryPath,
 		serviceName:    serviceName,
 		githubRepo:     githubRepo,
+		releaseLimits:  github.ReleaseLimits{MaxNewer: maxNewer, MaxOlder: maxOlder},
 	}
 	// Try to load status from previous session (in case of restart during update)
 	u.loadStatusFromFile()
@@ -138,26 +147,40 @@ func (u *Updater) setError(err error) {
 	log.Printf("[panel_updater] error: %s", err)
 }
 
-func (u *Updater) Check() (*CheckResult, error) {
-	release, err := FetchLatestRelease(u.githubRepo)
-	if err != nil {
-		return nil, fmt.Errorf("fetch latest release: %w", err)
-	}
-
-	latestVersion := strings.TrimPrefix(release.TagName, "v")
-
-	return &CheckResult{
-		CurrentVersion:  u.currentVersion,
-		LatestVersion:   latestVersion,
-		UpdateAvailable: latestVersion != u.currentVersion,
-		ReleaseName:     release.Name,
-		ReleaseURL:      release.HTMLURL,
-		PublishedAt:     release.PublishedAt.Format(time.RFC3339),
-		Changelog:       release.Body,
-	}, nil
+func (u *Updater) Releases() (*github.ReleasesResult, error) {
+	owner, repo := splitOwnerRepo(u.githubRepo)
+	return github.FetchReleases(owner, repo, u.currentVersion, NewAssetMatcher(), u.releaseLimits)
 }
 
-func (u *Updater) Apply() error {
+func (u *Updater) Check() (*CheckResult, error) {
+	result, err := u.Releases()
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &CheckResult{
+		CurrentVersion:  result.CurrentVersion,
+		UpdateAvailable: false,
+	}
+	for _, r := range result.Releases {
+		if !r.Prerelease && !r.IsDowngrade {
+			cr.LatestVersion = r.Version
+			cr.UpdateAvailable = true
+			cr.ReleaseName = r.Name
+			cr.ReleaseURL = r.HTMLURL
+			cr.PublishedAt = r.PublishedAt
+			cr.Changelog = r.Changelog
+			break
+		}
+	}
+	if !cr.UpdateAvailable {
+		cr.LatestVersion = result.CurrentVersion
+	}
+
+	return cr, nil
+}
+
+func (u *Updater) Apply(version string) error {
 	u.mu.Lock()
 	if u.status.Phase != PhaseIdle && u.status.Phase != PhaseDone && u.status.Phase != PhaseError {
 		u.mu.Unlock()
@@ -166,44 +189,49 @@ func (u *Updater) Apply() error {
 	u.status = Status{Phase: PhaseIdle}
 	u.mu.Unlock()
 
-	go u.applyAsync()
+	go u.applyAsync(version)
 	return nil
 }
 
-func (u *Updater) applyAsync() {
+func (u *Updater) applyAsync(version string) {
 	u.appendLog(fmt.Sprintf("config: binary_path=%s, service=%s, repo=%s", u.binaryPath, u.serviceName, u.githubRepo))
 	u.appendLog(fmt.Sprintf("arch: asset=%s", AssetName()))
 
-	u.setStatus(PhaseChecking, "fetching latest release")
+	u.setStatus(PhaseChecking, "fetching release")
 
-	release, err := FetchLatestRelease(u.githubRepo)
+	owner, repoName := splitOwnerRepo(u.githubRepo)
+	var release *github.ReleaseInfo
+	var err error
+	if version != "" {
+		u.appendLog(fmt.Sprintf("Fetching release %s...", version))
+		release, err = github.FetchRelease(owner, repoName, version, NewAssetMatcher())
+	} else {
+		u.appendLog("Fetching latest release...")
+		result, fetchErr := github.FetchReleases(owner, repoName, u.currentVersion, NewAssetMatcher(), u.releaseLimits)
+		if fetchErr != nil {
+			err = fetchErr
+		} else {
+			for i := range result.Releases {
+				if !result.Releases[i].Prerelease && !result.Releases[i].IsDowngrade {
+					release = &result.Releases[i]
+					break
+				}
+			}
+			if release == nil {
+				err = fmt.Errorf("no stable release found newer than %s", u.currentVersion)
+			}
+		}
+	}
 	if err != nil {
 		u.setError(fmt.Errorf("fetch release: %w", err))
 		return
 	}
-	u.appendLog(fmt.Sprintf("latest release: %s (%s)", release.TagName, release.Name))
-
-	tarAsset, ok := FindAsset(release, AssetName())
-	if !ok {
-		available := make([]string, len(release.Assets))
-		for i, a := range release.Assets {
-			available[i] = a.Name
-		}
-		u.setError(fmt.Errorf("asset %s not found in release %s (available: %v)", AssetName(), release.TagName, available))
-		return
-	}
-	u.appendLog(fmt.Sprintf("tarball: %s (%d bytes)", tarAsset.Name, tarAsset.Size))
-
-	shaAsset, ok := FindAsset(release, Sha256AssetName())
-	if !ok {
-		u.setError(fmt.Errorf("checksum asset %s not found", Sha256AssetName()))
-		return
-	}
+	u.appendLog(fmt.Sprintf("target release: %s (%s)", release.Version, release.Name))
 
 	// Download sha256
 	u.setStatus(PhaseDownloading, "downloading checksum")
-	u.appendLog(fmt.Sprintf("downloading sha256 from %s", shaAsset.BrowserDownloadURL))
-	shaPath, err := DownloadFile(shaAsset.BrowserDownloadURL)
+	u.appendLog(fmt.Sprintf("downloading sha256 from %s", release.ChecksumURL))
+	shaPath, err := DownloadFile(release.ChecksumURL)
 	if err != nil {
 		u.setError(fmt.Errorf("download checksum: %w", err))
 		return
@@ -219,9 +247,9 @@ func (u *Updater) applyAsync() {
 	u.appendLog(fmt.Sprintf("expected sha256: %s", strings.TrimSpace(string(shaBytes))))
 
 	// Download tarball
-	u.setStatus(PhaseDownloading, fmt.Sprintf("downloading %s (%d MB)", tarAsset.Name, tarAsset.Size/1024/1024))
-	u.appendLog(fmt.Sprintf("downloading tarball from %s", tarAsset.BrowserDownloadURL))
-	tarPath, err := DownloadFile(tarAsset.BrowserDownloadURL)
+	u.setStatus(PhaseDownloading, fmt.Sprintf("downloading %s (%d MB)", AssetName(), release.AssetSize/1024/1024))
+	u.appendLog(fmt.Sprintf("downloading tarball from %s", release.AssetURL))
+	tarPath, err := DownloadFile(release.AssetURL)
 	if err != nil {
 		os.Remove(shaPath)
 		u.setError(fmt.Errorf("download tarball: %w", err))
@@ -271,13 +299,13 @@ func (u *Updater) applyAsync() {
 		u.appendLog(fmt.Sprintf("new binary written: %s (%d bytes, mode %s)", u.binaryPath, newInfo.Size(), newInfo.Mode()))
 	}
 
-	u.appendLog(fmt.Sprintf("updated to %s", release.TagName))
+	u.appendLog(fmt.Sprintf("updated to %s", release.Version))
 
 	// Save final status to file BEFORE restart (so it survives the restart)
 	u.mu.Lock()
 	finalStatus := Status{
 		Phase:   PhaseDone,
-		Message: fmt.Sprintf("updated to %s", strings.TrimPrefix(release.TagName, "v")),
+		Message: fmt.Sprintf("updated to %s", release.Version),
 		Log:     u.status.Log,
 	}
 	u.mu.Unlock()
@@ -306,5 +334,5 @@ func (u *Updater) applyAsync() {
 	}
 	u.appendLog("systemctl restart succeeded")
 
-	u.setStatus(PhaseDone, fmt.Sprintf("updated to %s", strings.TrimPrefix(release.TagName, "v")))
+	u.setStatus(PhaseDone, fmt.Sprintf("updated to %s", release.Version))
 }
