@@ -23,6 +23,9 @@ auth_header = "your-telemt-api-secret"
 # service_name = "telemt"
 # GitHub repository for update checks (default: telemt/telemt)
 # github_repo = "telemt/telemt"
+# Path to Telemt config file (optional, for Docker or custom setups)
+# If not set, the path is obtained from Telemt API automatically
+# config_path = "/etc/telemt/config.toml"
 
 [panel]
 # Path to telemt-panel binary (default: /usr/local/bin/telemt-panel)
@@ -31,6 +34,9 @@ auth_header = "your-telemt-api-secret"
 # service_name = "telemt-panel"
 # GitHub repository for update checks (default: amirotin/telemt_panel)
 # github_repo = "amirotin/telemt_panel"
+# Maximum number of newer/older releases shown in update selector (default: 10)
+# max_newer_releases = 10
+# max_older_releases = 10
 
 [tls]
 # Option 1: Custom certificates
@@ -49,6 +55,8 @@ auth_header = "your-telemt-api-secret"
 # Download from: https://dev.maxmind.com/geoip/geolite2-free-geolocation-data
 # If not set, GeoIP features are disabled (IP lists shown without geo data)
 # db_path = "/var/lib/telemt-panel/GeoLite2-City.mmdb"
+# Optional: GeoLite2 ASN database for autonomous system number lookups
+# asn_db_path = "/var/lib/telemt-panel/GeoLite2-ASN.mmdb"
 
 [auth]
 # Panel admin credentials
