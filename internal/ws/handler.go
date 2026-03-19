@@ -17,9 +17,15 @@ var upgrader = websocket.Upgrader{
 		if origin == "" {
 			return true
 		}
-		// Allow same-origin requests only
 		host := r.Host
-		return origin == "http://"+host || origin == "https://"+host
+		if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
+			host = fwdHost
+		}
+		proto := "http"
+		if fwdProto := r.Header.Get("X-Forwarded-Proto"); fwdProto != "" {
+			proto = fwdProto
+		}
+		return origin == proto+"://"+host
 	},
 }
 
