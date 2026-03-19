@@ -68,7 +68,7 @@ function VersionSelect({
   }
   return (
     <select
-      className="bg-gray-700 text-white rounded px-3 py-1.5 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+      className="w-full bg-gray-700 text-white rounded px-3 py-1.5 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
       value={selected?.version || ''}
       onChange={(e) => {
         const r = releases.find((r) => r.version === e.target.value);
@@ -332,7 +332,7 @@ export function UpdatePage() {
           <div className="space-y-3 lg:space-y-4">
             <div className="grid grid-cols-2 gap-2 lg:gap-3">
               <MetricCard label="Current Version" value={panelCurrentVersion || '—'} />
-              <div>
+              <div className="flex items-center">
                 <VersionSelect
                   releases={panelReleases}
                   selected={panelSelectedRelease}
@@ -507,7 +507,7 @@ export function UpdatePage() {
           <div className="space-y-3 lg:space-y-4">
             <div className="grid grid-cols-2 gap-2 lg:gap-3">
               <MetricCard label="Current Version" value={currentVersion || '—'} />
-              <div>
+              <div className="flex items-center">
                 <VersionSelect
                   releases={releases}
                   selected={selectedRelease}
