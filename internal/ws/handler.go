@@ -22,6 +22,9 @@ var upgrader = websocket.Upgrader{
 			host = fwdHost
 		}
 		proto := "http"
+		if r.TLS != nil {
+			proto = "https"
+		}
 		if fwdProto := r.Header.Get("X-Forwarded-Proto"); fwdProto != "" {
 			proto = fwdProto
 		}
