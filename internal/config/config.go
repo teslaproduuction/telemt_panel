@@ -21,7 +21,8 @@ type Config struct {
 }
 
 type GeoIPConfig struct {
-	DBPath string `toml:"db_path"`
+	DBPath    string `toml:"db_path"`
+	ASNDBPath string `toml:"asn_db_path"`
 }
 
 type TLSConfig struct {
@@ -37,6 +38,7 @@ type TelemtConfig struct {
 	BinaryPath  string `toml:"binary_path"`
 	ServiceName string `toml:"service_name"`
 	GithubRepo  string `toml:"github_repo"`
+	ConfigPath  string `toml:"config_path"`
 }
 
 type PanelConfig struct {

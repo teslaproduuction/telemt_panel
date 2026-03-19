@@ -31,6 +31,8 @@ interface GeoIPInfo {
   country: string;
   country_name: string;
   city: string;
+  asn?: number;
+  asn_org?: string;
 }
 
 function countryFlag(code: string): string {
@@ -65,6 +67,8 @@ function IPTable({ ips, geoData, hasGeo }: IPTableProps) {
         if (geo.country.toLowerCase().includes(q)) return true;
         if (geo.country_name.toLowerCase().includes(q)) return true;
         if (geo.city.toLowerCase().includes(q)) return true;
+        if (geo.asn && String(geo.asn).includes(q)) return true;
+        if (geo.asn_org && geo.asn_org.toLowerCase().includes(q)) return true;
       }
       return false;
     });
@@ -80,7 +84,7 @@ function IPTable({ ips, geoData, hasGeo }: IPTableProps) {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary" />
           <input
             type="text"
-            placeholder="Search IP, country, city..."
+            placeholder="Search IP, country, city, ASN..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border border-border bg-background text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent"
@@ -99,12 +103,13 @@ function IPTable({ ips, geoData, hasGeo }: IPTableProps) {
                 <TableHead>IP Address</TableHead>
                 {hasGeo && <TableHead>Country</TableHead>}
                 {hasGeo && <TableHead>City</TableHead>}
+                {hasGeo && <TableHead>ASN</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {pageIps.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={hasGeo ? 3 : 1} className="text-center text-text-secondary py-6">
+                  <TableCell colSpan={hasGeo ? 4 : 1} className="text-center text-text-secondary py-6">
                     {search ? 'No IPs match your search' : 'No IPs'}
                   </TableCell>
                 </TableRow>
@@ -125,6 +130,18 @@ function IPTable({ ips, geoData, hasGeo }: IPTableProps) {
                       )}
                       {hasGeo && (
                         <TableCell className="text-sm">{geo?.city || '—'}</TableCell>
+                      )}
+                      {hasGeo && (
+                        <TableCell className="text-sm">
+                          {geo?.asn ? (
+                            <span>
+                              <span className="font-mono">{geo.asn}</span>
+                              {geo.asn_org && (
+                                <span className="text-text-secondary ml-1.5">{geo.asn_org}</span>
+                              )}
+                            </span>
+                          ) : '—'}
+                        </TableCell>
                       )}
                     </TableRow>
                   );

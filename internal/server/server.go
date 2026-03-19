@@ -290,16 +290,27 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: map[string]string{"status": "restarting"}})
 	})))
 
-	// Telemt config endpoints
-	mux.Handle("GET /api/telemt/config/raw", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Get config path from Telemt API
+	// Helper: resolve Telemt config path from panel config or Telemt API
+	getTelemtConfigPath := func(w http.ResponseWriter) (string, bool) {
+		if s.cfg.Telemt.ConfigPath != "" {
+			return s.cfg.Telemt.ConfigPath, true
+		}
 		systemInfo, err := telemtProxy.GetSystemInfo()
 		if err != nil {
 			writeError(w, http.StatusBadGateway, "telemt_api_error", err.Error())
+			return "", false
+		}
+		return systemInfo.ConfigPath, true
+	}
+
+	// Telemt config endpoints
+	mux.Handle("GET /api/telemt/config/raw", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		configPath, ok := getTelemtConfigPath(w)
+		if !ok {
 			return
 		}
 
-		content, hash, err := telemt_config.ReadConfig(systemInfo.ConfigPath)
+		content, hash, err := telemt_config.ReadConfig(configPath)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "read_config_failed", err.Error())
 			return
@@ -309,7 +320,7 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 			OK: true,
 			Data: map[string]string{
 				"content": content,
-				"path":    systemInfo.ConfigPath,
+				"path":    configPath,
 				"hash":    hash,
 			},
 		})
@@ -325,15 +336,13 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 			return
 		}
 
-		// Get config path
-		systemInfo, err := telemtProxy.GetSystemInfo()
-		if err != nil {
-			writeError(w, http.StatusBadGateway, "telemt_api_error", err.Error())
+		configPath, ok := getTelemtConfigPath(w)
+		if !ok {
 			return
 		}
 
 		// Save config
-		newHash, err := telemt_config.SaveConfig(systemInfo.ConfigPath, req.Content)
+		newHash, err := telemt_config.SaveConfig(configPath, req.Content)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "save_failed", err.Error())
 			return
@@ -366,15 +375,13 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 			return
 		}
 
-		// Get config path
-		systemInfo, err := telemtProxy.GetSystemInfo()
-		if err != nil {
-			writeError(w, http.StatusBadGateway, "telemt_api_error", err.Error())
+		configPath, ok := getTelemtConfigPath(w)
+		if !ok {
 			return
 		}
 
 		// Quick update
-		newHash, err := telemt_config.QuickUpdate(systemInfo.ConfigPath, req.Updates)
+		newHash, err := telemt_config.QuickUpdate(configPath, req.Updates)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "update_failed", err.Error())
 			return
@@ -401,7 +408,7 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 	var geoipLookup *geoip.Lookup
 	if s.cfg.GeoIP.DBPath != "" {
 		var geoErr error
-		geoipLookup, geoErr = geoip.New(s.cfg.GeoIP.DBPath)
+		geoipLookup, geoErr = geoip.New(s.cfg.GeoIP.DBPath, s.cfg.GeoIP.ASNDBPath)
 		if geoErr != nil {
 			log.Printf("WARNING: failed to open GeoIP database: %s", geoErr)
 		} else {

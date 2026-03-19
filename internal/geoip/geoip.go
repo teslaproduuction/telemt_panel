@@ -11,22 +11,40 @@ type IPInfo struct {
 	Country     string `json:"country"`
 	CountryName string `json:"country_name"`
 	City        string `json:"city"`
+	ASN         uint   `json:"asn,omitempty"`
+	ASNOrg      string `json:"asn_org,omitempty"`
 }
 
 type Lookup struct {
-	db *maxminddb.Reader
+	db    *maxminddb.Reader
+	asnDB *maxminddb.Reader
 }
 
-func New(dbPath string) (*Lookup, error) {
+func New(dbPath, asnDBPath string) (*Lookup, error) {
 	db, err := maxminddb.Open(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	return &Lookup{db: db}, nil
+	l := &Lookup{db: db}
+	if asnDBPath != "" {
+		asnDB, err := maxminddb.Open(asnDBPath)
+		if err != nil {
+			db.Close()
+			return nil, err
+		}
+		l.asnDB = asnDB
+	}
+	return l, nil
 }
 
 func (l *Lookup) Close() error {
-	return l.db.Close()
+	err := l.db.Close()
+	if l.asnDB != nil {
+		if e := l.asnDB.Close(); e != nil && err == nil {
+			err = e
+		}
+	}
+	return err
 }
 
 type mmdbRecord struct {
@@ -37,6 +55,11 @@ type mmdbRecord struct {
 	City struct {
 		Names map[string]string `maxminddb:"names"`
 	} `maxminddb:"city"`
+}
+
+type asnRecord struct {
+	ASN uint   `maxminddb:"autonomous_system_number"`
+	Org string `maxminddb:"autonomous_system_organization"`
 }
 
 func (l *Lookup) LookupIPs(ips []string) []IPInfo {
@@ -63,6 +86,14 @@ func (l *Lookup) LookupIPs(ips []string) []IPInfo {
 		}
 		if name, ok := record.City.Names["en"]; ok {
 			info.City = name
+		}
+
+		if l.asnDB != nil {
+			var asn asnRecord
+			if err := l.asnDB.Lookup(ip, &asn); err == nil && asn.ASN != 0 {
+				info.ASN = asn.ASN
+				info.ASNOrg = asn.Org
+			}
 		}
 
 		results = append(results, info)
