@@ -270,7 +270,13 @@ export function RuntimePage() {
   const connections = useEndpoint<ConnectionsData>(wsData, '/v1/runtime/connections/summary');
   const events = useEndpoint<EventsData>(wsData, '/v1/runtime/events/recent');
   const zeroAll = useEndpoint<Record<string, unknown>>(wsData, '/v1/stats/zero/all');
-  const minimalAll = useEndpoint<{ me_runtime?: Record<string, unknown>; network_path?: Array<Record<string, unknown>> }>(wsData, '/v1/stats/minimal/all');
+  const minimalAll = useEndpoint<{
+    enabled?: boolean;
+    data?: {
+      me_runtime?: Record<string, unknown>;
+      network_path?: Array<Record<string, unknown>>;
+    };
+  }>(wsData, '/v1/stats/minimal/all');
 
   const firstError = Object.values(errors)[0];
 
@@ -947,10 +953,10 @@ export function RuntimePage() {
         )}
 
         {/* ME Runtime (from minimal/all) */}
-        {minimalAll?.me_runtime && Object.keys(minimalAll.me_runtime).length > 0 && (
+        {minimalAll?.data?.me_runtime && Object.keys(minimalAll.data.me_runtime).length > 0 && (
           <CollapsibleSection title="ME Runtime" defaultOpen={false}>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {Object.entries(minimalAll.me_runtime).map(([key, value]) => {
+              {Object.entries(minimalAll.data!.me_runtime!).map(([key, value]) => {
                 if (value == null || typeof value === 'object') return null;
                 const label = key.replace(/_/g, ' ');
                 if (typeof value === 'boolean') {
@@ -977,10 +983,10 @@ export function RuntimePage() {
         )}
 
         {/* Network Path (from minimal/all) */}
-        {minimalAll?.network_path && minimalAll.network_path.length > 0 && (
+        {minimalAll?.data?.network_path && minimalAll.data.network_path.length > 0 && (
           <CollapsibleSection title="Network Path" defaultOpen={false}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {minimalAll.network_path.map((entry, i) => (
+              {minimalAll.data!.network_path!.map((entry, i) => (
                 <div key={i} className="bg-background rounded p-3 border border-border/50 text-xs">
                   {Object.entries(entry).map(([key, value]) => (
                     <div key={key} className="flex justify-between py-0.5">
