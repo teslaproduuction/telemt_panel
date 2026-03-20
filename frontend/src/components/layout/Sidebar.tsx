@@ -35,7 +35,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "w-60 h-screen bg-surface border-r border-border flex flex-col fixed left-0 top-0 z-50 transition-transform duration-300",
+        "w-60 h-dvh bg-surface border-r border-border flex flex-col fixed left-0 top-0 z-50 transition-transform duration-300",
         "lg:translate-x-0",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
