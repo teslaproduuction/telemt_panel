@@ -51,7 +51,7 @@ function VersionSelect({
   currentVersion: string;
 }) {
   if (loading) {
-    return <div className="text-sm text-gray-400">Загрузка релизов...</div>;
+    return <div className="text-sm text-text-secondary">Загрузка релизов...</div>;
   }
   if (error) {
     return (
@@ -64,11 +64,11 @@ function VersionSelect({
     );
   }
   if (releases.length === 0) {
-    return <div className="text-sm text-gray-400">Нет доступных версий</div>;
+    return <div className="text-sm text-text-secondary">Нет доступных версий</div>;
   }
   return (
     <select
-      className="w-full bg-gray-700 text-white rounded px-3 py-1.5 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+      className="w-full bg-surface text-text-primary rounded px-3 py-1.5 text-sm border border-border focus:border-accent focus:outline-none"
       value={selected?.version || ''}
       onChange={(e) => {
         const r = releases.find((r) => r.version === e.target.value);
@@ -113,22 +113,22 @@ function ConfirmModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-md mx-4 border border-gray-700">
-        <h3 className="text-lg font-semibold text-white mb-4">Подтверждение</h3>
+      <div className="bg-surface rounded-lg p-6 max-w-md mx-4 border border-border">
+        <h3 className="text-lg font-semibold text-text-primary mb-4">Подтверждение</h3>
         {warnings.map((w, i) => (
-          <p key={i} className="text-yellow-400 text-sm mb-2">{w}</p>
+          <p key={i} className="text-warning text-sm mb-2">{w}</p>
         ))}
-        <p className="text-gray-300 text-sm mt-4">Продолжить установку?</p>
+        <p className="text-text-secondary text-sm mt-4">Продолжить установку?</p>
         <div className="flex gap-3 mt-6 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-500 text-sm"
+            className="px-4 py-2 rounded bg-surface-hover text-text-primary hover:bg-border text-sm"
           >
             Отмена
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded bg-yellow-600 text-white hover:bg-yellow-500 text-sm"
+            className="px-4 py-2 rounded bg-warning text-white hover:opacity-90 text-sm"
           >
             Продолжить
           </button>
