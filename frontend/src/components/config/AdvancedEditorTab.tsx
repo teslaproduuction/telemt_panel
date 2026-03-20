@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
+import { useTheme } from '@/hooks/useTheme';
 
 interface AdvancedEditorTabProps {
   content: string;
@@ -8,6 +9,7 @@ interface AdvancedEditorTabProps {
 
 export function AdvancedEditorTab({ content, onChange }: AdvancedEditorTabProps) {
   const editorRef = useRef<any>(null);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -33,7 +35,7 @@ export function AdvancedEditorTab({ content, onChange }: AdvancedEditorTabProps)
         value={content}
         onChange={(value) => onChange(value || '')}
         onMount={handleEditorDidMount}
-        theme="vs-dark"
+        theme={theme === 'dark' ? 'vs-dark' : 'light'}
         options={{
           minimap: { enabled: false },
           fontSize: 14,

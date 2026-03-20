@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Activity, Shield, Network, Settings, ArrowUpCircle, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Users, Activity, Shield, Network, Settings, ArrowUpCircle, LogOut, X, Sun, Moon, Github } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/hooks/useTheme';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -20,6 +21,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const { logout, username } = useAuth();
+  const { theme, toggle: toggleTheme } = useTheme();
 
   return (
     <>
@@ -75,6 +77,22 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           <div className="text-xs text-text-secondary mb-2 px-3 truncate">
             {username}
           </div>
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover w-full transition-colors"
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          </button>
+          <a
+            href="https://github.com/amirotin/telemt_panel"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover w-full transition-colors"
+          >
+            <Github size={18} />
+            GitHub
+          </a>
           <button
             onClick={logout}
             className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-text-secondary hover:text-danger hover:bg-surface-hover w-full transition-colors"
