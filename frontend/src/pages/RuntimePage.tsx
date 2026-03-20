@@ -254,6 +254,8 @@ const ENDPOINTS = [
   '/v1/runtime/me-selftest',
   '/v1/runtime/connections/summary',
   '/v1/runtime/events/recent',
+  '/v1/stats/zero/all',
+  '/v1/stats/minimal/all',
 ];
 
 export function RuntimePage() {
@@ -267,6 +269,8 @@ export function RuntimePage() {
   const meSelftest = useEndpoint<MeSelftestData>(wsData, '/v1/runtime/me-selftest');
   const connections = useEndpoint<ConnectionsData>(wsData, '/v1/runtime/connections/summary');
   const events = useEndpoint<EventsData>(wsData, '/v1/runtime/events/recent');
+  const zeroAll = useEndpoint<Record<string, unknown>>(wsData, '/v1/stats/zero/all');
+  const minimalAll = useEndpoint<{ me_runtime?: Record<string, unknown>; network_path?: Array<Record<string, unknown>> }>(wsData, '/v1/stats/minimal/all');
 
   const firstError = Object.values(errors)[0];
 
@@ -878,6 +882,115 @@ export function RuntimePage() {
                 </div>
               </div>
             )}
+          </CollapsibleSection>
+        )}
+
+        {/* Zero Stats (full counters) */}
+        {zeroAll && Object.keys(zeroAll).length > 0 && (
+          <CollapsibleSection title="Statistics (zero/all)" defaultOpen={false}>
+            <div className="space-y-4">
+              {Object.entries(zeroAll).map(([section, value]) => {
+                if (value == null || typeof value !== 'object') return null;
+                const entries = Object.entries(value as Record<string, unknown>);
+                if (entries.length === 0) return null;
+                return (
+                  <div key={section} className="bg-background rounded p-3 border border-border/50">
+                    <h4 className="text-xs font-semibold text-accent uppercase tracking-wide mb-2">
+                      {section.replace(/_/g, ' ')}
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {entries.map(([key, val]) => {
+                        if (val == null || typeof val === 'object') return null;
+                        const label = key.replace(/_total$/, '').replace(/_/g, ' ');
+                        let display = String(val);
+                        if (typeof val === 'number') {
+                          display = key.includes('seconds') || key.includes('_secs')
+                            ? `${(val as number).toFixed(1)}s`
+                            : key.includes('pct') || key.includes('ratio')
+                              ? `${((val as number) * (val <= 1 ? 100 : 1)).toFixed(1)}%`
+                              : formatNumber(val as number);
+                        }
+                        if (typeof val === 'boolean') {
+                          return (
+                            <div key={key} className="flex items-center justify-between gap-2 text-xs">
+                              <span className="text-text-secondary truncate">{label}</span>
+                              <StatusBadge status={val} />
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={key} className="text-xs">
+                            <div className="text-text-secondary truncate">{label}</div>
+                            <div className="text-text-primary font-medium tabular-nums">{display}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* Render nested arrays (e.g. handshake_error_codes) */}
+                    {entries.filter(([, v]) => Array.isArray(v) && (v as unknown[]).length > 0).map(([key, val]) => (
+                      <div key={key} className="mt-2">
+                        <span className="text-xs text-text-secondary">{key.replace(/_/g, ' ')}:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(val as Array<Record<string, unknown>>).map((item, i) => (
+                            <span key={i} className="bg-surface px-2 py-0.5 rounded text-[10px] border border-border/30">
+                              {Object.entries(item).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleSection>
+        )}
+
+        {/* ME Runtime (from minimal/all) */}
+        {minimalAll?.me_runtime && Object.keys(minimalAll.me_runtime).length > 0 && (
+          <CollapsibleSection title="ME Runtime" defaultOpen={false}>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {Object.entries(minimalAll.me_runtime).map(([key, value]) => {
+                if (value == null || typeof value === 'object') return null;
+                const label = key.replace(/_/g, ' ');
+                if (typeof value === 'boolean') {
+                  return (
+                    <div key={key} className="flex items-center justify-between gap-2 bg-background rounded p-2 border border-border/50 text-xs">
+                      <span className="text-text-secondary truncate">{label}</span>
+                      <StatusBadge status={value} />
+                    </div>
+                  );
+                }
+                let display = String(value);
+                if (typeof value === 'number') {
+                  display = key.includes('_secs') ? `${value}s` : key.includes('_ms') ? `${value}ms` : String(value);
+                }
+                return (
+                  <div key={key} className="bg-background rounded p-2 border border-border/50 text-xs">
+                    <div className="text-text-secondary truncate">{label}</div>
+                    <div className="text-text-primary font-medium">{display}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleSection>
+        )}
+
+        {/* Network Path (from minimal/all) */}
+        {minimalAll?.network_path && minimalAll.network_path.length > 0 && (
+          <CollapsibleSection title="Network Path" defaultOpen={false}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {minimalAll.network_path.map((entry, i) => (
+                <div key={i} className="bg-background rounded p-3 border border-border/50 text-xs">
+                  {Object.entries(entry).map(([key, value]) => (
+                    <div key={key} className="flex justify-between py-0.5">
+                      <span className="text-text-secondary">{key.replace(/_/g, ' ')}</span>
+                      <span className="text-text-primary font-medium font-mono">{value != null ? String(value) : '-'}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           </CollapsibleSection>
         )}
 
