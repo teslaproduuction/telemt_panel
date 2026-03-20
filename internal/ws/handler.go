@@ -18,6 +18,7 @@ func removeProtocol(rawURL string) (string, error) {
         return "", err
     }
     return parsed.Host, nil
+}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
