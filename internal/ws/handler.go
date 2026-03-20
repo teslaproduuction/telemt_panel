@@ -5,11 +5,19 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
+
+func removeProtocol(rawURL string) (string, error) {
+    parsed, err := url.Parse(rawURL)
+    if err != nil {
+        return "", err
+    }
+    return parsed.Host, nil
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -21,14 +29,10 @@ var upgrader = websocket.Upgrader{
 		if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
 			host = fwdHost
 		}
-		proto := "http"
-		if r.TLS != nil {
-			proto = "https"
-		}
-		if fwdProto := r.Header.Get("X-Forwarded-Proto"); fwdProto != "" {
-			proto = fwdProto
-		}
-		return origin == proto+"://"+host
+
+		origin, _ = removeProtocol(origin)
+		
+		return origin == host
 	},
 }
 
