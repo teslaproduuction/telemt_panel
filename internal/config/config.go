@@ -56,6 +56,22 @@ type AuthConfig struct {
 	SessionTTL   string `toml:"session_ttl"`
 }
 
+// checkFileReadable verifies that a file exists and can be opened for reading.
+func checkFileReadable(field, path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%s: file not found: %s", field, path)
+		}
+		if os.IsPermission(err) {
+			return fmt.Errorf("%s: permission denied: %s", field, path)
+		}
+		return fmt.Errorf("%s: cannot open file: %w", field, err)
+	}
+	f.Close()
+	return nil
+}
+
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -134,6 +150,18 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Auth.JWTSecret == "" {
 		return nil, fmt.Errorf("auth.jwt_secret is required")
+	}
+
+	// Validate GeoIP database paths are accessible
+	if cfg.GeoIP.DBPath != "" {
+		if err := checkFileReadable("geoip.db_path", cfg.GeoIP.DBPath); err != nil {
+			return nil, err
+		}
+	}
+	if cfg.GeoIP.ASNDBPath != "" {
+		if err := checkFileReadable("geoip.asn_db_path", cfg.GeoIP.ASNDBPath); err != nil {
+			return nil, err
+		}
 	}
 
 	return cfg, nil

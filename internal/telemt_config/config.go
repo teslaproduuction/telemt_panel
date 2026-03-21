@@ -43,6 +43,9 @@ func SaveConfig(configPath, content string) (newHash string, err error) {
 		return "", fmt.Errorf("invalid TOML syntax: %w", err)
 	}
 
+	// Strip underscores from integer literals (e.g. 8_443 → 8443)
+	content = removeIntegerUnderscores(content)
+
 	// Create backup
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := fmt.Sprintf("%s.backup.%s", configPath, timestamp)

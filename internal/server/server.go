@@ -407,11 +407,16 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 	// GeoIP lookup endpoint
 	var geoipLookup *geoip.Lookup
 	if s.cfg.GeoIP.DBPath != "" {
+		log.Printf("GeoIP: loading city database from %s", s.cfg.GeoIP.DBPath)
+		if s.cfg.GeoIP.ASNDBPath != "" {
+			log.Printf("GeoIP: loading ASN database from %s", s.cfg.GeoIP.ASNDBPath)
+		}
 		var geoErr error
 		geoipLookup, geoErr = geoip.New(s.cfg.GeoIP.DBPath, s.cfg.GeoIP.ASNDBPath)
 		if geoErr != nil {
-			log.Printf("WARNING: failed to open GeoIP database: %s", geoErr)
+			log.Printf("WARNING: failed to open GeoIP database: %s (check that db_path and asn_db_path point to valid .mmdb files)", geoErr)
 		} else {
+			log.Printf("GeoIP: databases loaded successfully")
 			defer geoipLookup.Close()
 		}
 	}

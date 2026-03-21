@@ -147,7 +147,7 @@ export function QuickSettingsTab({ content, onChange }: QuickSettingsTabProps) {
         }
       });
 
-      const newContent = stringify(parsed);
+      const newContent = stringify(parsed).replace(/(\d)_(?=\d)/g, '$1');
       onChange(newContent);
     } catch (err: any) {
       console.error('Failed to update content:', err);
