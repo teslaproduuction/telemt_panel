@@ -14,6 +14,7 @@ import (
 	"github.com/telemt/telemt-panel/internal/auth"
 	"github.com/telemt/telemt-panel/internal/config"
 	"github.com/telemt/telemt-panel/internal/geoip"
+	"github.com/telemt/telemt-panel/internal/logs"
 	"github.com/telemt/telemt-panel/internal/panel_updater"
 	"github.com/telemt/telemt-panel/internal/proxy"
 	"github.com/telemt/telemt-panel/internal/spa"
@@ -444,6 +445,29 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		results := geoipLookup.LookupIPs(req.IPs)
 		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: results})
 	})))
+
+	// Logs
+	logStatus := logs.CheckStatus(s.cfg.Telemt.ServiceName, s.cfg.Telemt.ContainerName)
+	var logsWsHandler http.Handler
+	if logStatus.Available {
+		logSource, err := logs.DetectSource(s.cfg.Telemt.ServiceName, s.cfg.Telemt.ContainerName)
+		if err != nil {
+			log.Printf("WARN: log source init failed: %v", err)
+		} else {
+			logsWsHandler = logs.NewWsHandler(logSource, 2)
+			log.Printf("Log source: %s (%s)", logSource.Name(), logStatus.Target)
+		}
+	}
+
+	// Log status endpoint — always registered (frontend needs it to show unavailable state)
+	mux.Handle("GET /api/logs/status", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: logStatus})
+	})))
+
+	// Log WebSocket — only if source is available
+	if logsWsHandler != nil {
+		mux.Handle("/api/ws/logs", auth.RequireAuth(jwtSecret, logsWsHandler))
+	}
 
 	// Telemt API proxy (kept for direct REST calls like user CRUD)
 	mux.Handle("/api/telemt/", auth.RequireAuth(jwtSecret, telemtProxy))

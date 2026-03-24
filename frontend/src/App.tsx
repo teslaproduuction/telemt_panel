@@ -12,6 +12,7 @@ import { SecurityPage } from '@/pages/SecurityPage';
 import { UpstreamsPage } from '@/pages/UpstreamsPage';
 import { UpdatePage } from '@/pages/UpdatePage';
 import { ConfigPage } from '@/pages/ConfigPage';
+import { LogsPage } from '@/pages/LogsPage';
 
 function AuthenticatedApp() {
   const { username, loading } = useAuth();
@@ -41,6 +42,7 @@ function AuthenticatedApp() {
           <Route path="/upstreams" element={<UpstreamsPage />} />
           <Route path="/config" element={<ConfigPage />} />
           <Route path="/update" element={<UpdatePage />} />
+          <Route path="/logs" element={<LogsPage />} />
         </Route>
       </Routes>
     </WsContext.Provider>

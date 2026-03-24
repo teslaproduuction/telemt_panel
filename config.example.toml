@@ -26,6 +26,8 @@ auth_header = "your-telemt-api-secret"
 # Path to Telemt config file (optional, for Docker or custom setups)
 # If not set, the path is obtained from Telemt API automatically
 # config_path = "/etc/telemt/config.toml"
+# Docker container name (if Telemt runs in Docker)
+# container_name = "telemt"
 
 [panel]
 # Path to telemt-panel binary (default: /usr/local/bin/telemt-panel)

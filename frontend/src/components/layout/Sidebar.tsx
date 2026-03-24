@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Activity, Shield, Network, Settings, ArrowUpCircle, LogOut, X, Sun, Moon, Github } from 'lucide-react';
+import { LayoutDashboard, Users, Activity, Shield, Network, Settings, ArrowUpCircle, ScrollText, LogOut, X, Sun, Moon, Github } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
@@ -12,6 +12,7 @@ const navItems = [
   { to: '/upstreams', icon: Network, label: 'Upstreams & DCs' },
   { to: '/config', icon: Settings, label: 'Configuration' },
   { to: '/update', icon: ArrowUpCircle, label: 'Update' },
+  { to: '/logs', icon: ScrollText, label: 'Logs' },
 ];
 
 interface SidebarProps {

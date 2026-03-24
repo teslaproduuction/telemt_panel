@@ -33,12 +33,13 @@ type TLSConfig struct {
 }
 
 type TelemtConfig struct {
-	URL         string `toml:"url"`
-	AuthHeader  string `toml:"auth_header"`
-	BinaryPath  string `toml:"binary_path"`
-	ServiceName string `toml:"service_name"`
-	GithubRepo  string `toml:"github_repo"`
-	ConfigPath  string `toml:"config_path"`
+	URL           string `toml:"url"`
+	AuthHeader    string `toml:"auth_header"`
+	BinaryPath    string `toml:"binary_path"`
+	ServiceName   string `toml:"service_name"`
+	GithubRepo    string `toml:"github_repo"`
+	ConfigPath    string `toml:"config_path"`
+	ContainerName string `toml:"container_name"`
 }
 
 type PanelConfig struct {
