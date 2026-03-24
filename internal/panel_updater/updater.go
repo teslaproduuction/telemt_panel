@@ -229,6 +229,10 @@ func (u *Updater) applyAsync(version string) {
 	u.appendLog(fmt.Sprintf("target release: %s (%s)", release.Version, release.Name))
 
 	// Download sha256
+	if release.ChecksumURL == "" {
+		u.setError(fmt.Errorf("release %s has no checksum asset (*.sha256 for %s)", release.Version, AssetName()))
+		return
+	}
 	u.setStatus(PhaseDownloading, "downloading checksum")
 	u.appendLog(fmt.Sprintf("downloading sha256 from %s", release.ChecksumURL))
 	shaPath, err := DownloadFile(release.ChecksumURL)

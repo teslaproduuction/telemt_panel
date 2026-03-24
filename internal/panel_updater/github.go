@@ -18,20 +18,16 @@ func AssetName() string {
 	return "telemt-panel-" + archString() + "-linux-gnu.tar.gz"
 }
 
-func Sha256AssetName() string {
-	return "telemt-panel-" + archString() + "-linux-gnu.sha256"
-}
-
 func NewAssetMatcher() github.AssetMatcher {
 	binaryName := AssetName()
-	checksumName := Sha256AssetName()
+	prefix := strings.TrimSuffix(binaryName, ".tar.gz")
 	return func(assets []github.GitHubAsset) (*github.GitHubAsset, *github.GitHubAsset) {
 		var bin, sum *github.GitHubAsset
 		for i := range assets {
 			if assets[i].Name == binaryName {
 				bin = &assets[i]
 			}
-			if assets[i].Name == checksumName {
+			if sum == nil && strings.HasPrefix(assets[i].Name, prefix) && strings.HasSuffix(assets[i].Name, ".sha256") {
 				sum = &assets[i]
 			}
 		}
