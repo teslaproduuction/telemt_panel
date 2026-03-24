@@ -132,6 +132,10 @@ func QuickUpdate(configPath string, updates map[string]interface{}) (newHash str
 	// Remove underscores from integer literals (go-toml/v2 formats 8443 as 8_443)
 	cleaned := removeIntegerUnderscores(string(newContent))
 
+	// Convert inline empty tables like `key = {}` to proper TOML sections
+	// Telemt doesn't understand inline empty tables
+	cleaned = inlineTablesToSections(cleaned)
+
 	// Save
 	return SaveConfig(configPath, cleaned)
 }
@@ -174,6 +178,43 @@ func deleteNestedKey(m map[string]interface{}, key string) {
 	}
 
 	delete(current, parts[len(parts)-1])
+}
+
+var reInlineEmptyTable = regexp.MustCompile(`(?m)^(\w+)\s*=\s*\{\s*\}\s*$`)
+
+// inlineTablesToSections converts inline empty tables like `key = {}`
+// to proper TOML sections like `[parent.key]`.
+// Telemt doesn't understand inline empty tables.
+func inlineTablesToSections(s string) string {
+	lines := strings.Split(s, "\n")
+	var result []string
+	currentSection := ""
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Track current section
+		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") && !strings.HasPrefix(trimmed, "[[") {
+			currentSection = trimmed[1 : len(trimmed)-1]
+			result = append(result, line)
+			continue
+		}
+
+		if m := reInlineEmptyTable.FindStringSubmatch(trimmed); m != nil {
+			key := m[1]
+			fullSection := key
+			if currentSection != "" {
+				fullSection = currentSection + "." + key
+			}
+			result = append(result, "")
+			result = append(result, "["+fullSection+"]")
+			continue
+		}
+
+		result = append(result, line)
+	}
+
+	return strings.Join(result, "\n")
 }
 
 var reDigitUnderscore = regexp.MustCompile(`(\d)_(\d)`)

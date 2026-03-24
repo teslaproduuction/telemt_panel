@@ -10,7 +10,8 @@ export class ApiError extends Error {
 }
 
 async function request<T>(base: string, path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${base}${path}`, {
+  const url = `${base}${path}`;
+  const res = await fetch(url, {
     ...options,
     credentials: 'same-origin',
     headers: {
@@ -26,7 +27,8 @@ async function request<T>(base: string, path: string, options?: RequestInit): Pr
 
   const json = await res.json();
   if (!json.ok) {
-    throw new ApiError(json.error?.code || 'unknown', json.error?.message || 'Unknown error');
+    const message = json.error?.message || 'Unknown error';
+    throw new ApiError(json.error?.code || 'unknown', `${message} (${options?.method || 'GET'} ${path})`);
   }
 
   return json.data;

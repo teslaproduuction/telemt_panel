@@ -36,6 +36,36 @@ interface FormValues {
   'timeouts.client_ack'?: number;
 }
 
+// Convert inline empty tables like `key = {}` to proper TOML sections like `[parent.key]`
+// Telemt doesn't understand inline empty tables.
+function inlineTablesToSections(toml: string): string {
+  const lines = toml.split('\n');
+  const result: string[] = [];
+  let currentSection = '';
+
+  for (const line of lines) {
+    const sectionMatch = line.match(/^\[([^\]]+)\]$/);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1];
+      result.push(line);
+      continue;
+    }
+
+    const inlineMatch = line.match(/^(\w+)\s*=\s*\{\s*\}$/);
+    if (inlineMatch) {
+      const key = inlineMatch[1];
+      const fullSection = currentSection ? `${currentSection}.${key}` : key;
+      result.push('');
+      result.push(`[${fullSection}]`);
+      continue;
+    }
+
+    result.push(line);
+  }
+
+  return result.join('\n');
+}
+
 export function QuickSettingsTab({ content, onChange }: QuickSettingsTabProps) {
   const [formValues, setFormValues] = useState<FormValues>({});
   const [parseError, setParseError] = useState<string | null>(null);
@@ -147,7 +177,9 @@ export function QuickSettingsTab({ content, onChange }: QuickSettingsTabProps) {
         }
       });
 
-      const newContent = stringify(parsed).replace(/(\d)_(?=\d)/g, '$1');
+      const newContent = inlineTablesToSections(
+        stringify(parsed).replace(/(\d)_(?=\d)/g, '$1')
+      );
       onChange(newContent);
     } catch (err: any) {
       console.error('Failed to update content:', err);
