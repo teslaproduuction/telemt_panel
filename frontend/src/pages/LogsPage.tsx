@@ -9,30 +9,62 @@ interface LogSourceStatus {
   error?: string;
 }
 
-const LOG_LEVEL_PATTERNS: Array<{ regex: RegExp; color: string }> = [
-  { regex: /(\[(?:ERROR|ERR)\]|(?<=\s)(?:ERROR|ERR)(?=\s)|level=error)/i, color: 'text-red-400' },
-  { regex: /(\[(?:WARN|WARNING)\]|(?<=\s)(?:WARN|WARNING)(?=\s)|level=warn(?:ing)?)/i, color: 'text-yellow-400' },
-  { regex: /(\[DEBUG\]|(?<=\s)DEBUG(?=\s)|level=debug)/i, color: 'text-zinc-500' },
-  { regex: /(\[TRACE\]|(?<=\s)TRACE(?=\s)|level=trace)/i, color: 'text-zinc-600' },
-];
+const LOG_TOKEN_REGEX = new RegExp(
+  [
+    '(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:?\\d{2})?)',
+    '(\\b(?:ERROR|ERR)\\b|\\[(?:ERROR|ERR)\\])',
+    '(\\b(?:WARN|WARNING)\\b|\\[(?:WARN|WARNING)\\])',
+    '(\\bINFO\\b|\\[INFO\\])',
+    '(\\bDEBUG\\b|\\[DEBUG\\])',
+    '(\\bTRACE\\b|\\[TRACE\\])',
+    '(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}(?::\\d+)?)',
+    '(\\w+=)',
+  ].join('|'),
+  'g',
+);
+
+const TOKEN_COLORS: Record<number, string> = {
+  1: 'text-zinc-500',
+  2: 'text-red-400',
+  3: 'text-yellow-400',
+  4: 'text-green-400',
+  5: 'text-zinc-500',
+  6: 'text-zinc-600',
+  7: 'text-cyan-400',
+  8: 'text-purple-400',
+};
 
 function renderLogLine(text: string): React.ReactNode {
-  for (const { regex, color } of LOG_LEVEL_PATTERNS) {
-    const match = text.match(regex);
-    if (match && match.index !== undefined) {
-      const before = text.slice(0, match.index);
-      const level = match[0];
-      const after = text.slice(match.index + level.length);
-      return (
-        <>
-          <span className="text-zinc-300">{before}</span>
-          <span className={color}>{level}</span>
-          <span className="text-zinc-300">{after}</span>
-        </>
-      );
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let key = 0;
+
+  LOG_TOKEN_REGEX.lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = LOG_TOKEN_REGEX.exec(text)) !== null) {
+    let color = '';
+    for (let g = 1; g <= 8; g++) {
+      if (match[g] !== undefined) {
+        color = TOKEN_COLORS[g];
+        break;
+      }
     }
+    if (!color) continue;
+
+    if (match.index > lastIndex) {
+      parts.push(<span key={key++} className="text-zinc-300">{text.slice(lastIndex, match.index)}</span>);
+    }
+
+    parts.push(<span key={key++} className={color}>{match[0]}</span>);
+    lastIndex = match.index + match[0].length;
   }
-  return <span className="text-zinc-300">{text}</span>;
+
+  if (lastIndex < text.length) {
+    parts.push(<span key={key++} className="text-zinc-300">{text.slice(lastIndex)}</span>);
+  }
+
+  return parts.length > 0 ? <>{parts}</> : <span className="text-zinc-300">{text}</span>;
 }
 
 const LINE_OPTIONS = [100, 200, 500, 1000];

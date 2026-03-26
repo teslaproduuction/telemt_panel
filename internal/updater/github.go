@@ -10,6 +10,7 @@ import (
 )
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
+var downloadClient = &http.Client{Timeout: 5 * time.Minute}
 
 func archString() string {
 	if runtime.GOARCH == "arm64" {

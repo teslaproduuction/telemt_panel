@@ -16,6 +16,7 @@ import (
 )
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
+var downloadClient = &http.Client{Timeout: 5 * time.Minute}
 
 func DownloadFile(url string) (string, error) {
 	req, err := http.NewRequest("GET", url, nil)
@@ -23,7 +24,7 @@ func DownloadFile(url string) (string, error) {
 		return "", err
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := downloadClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("download: %w", err)
 	}
