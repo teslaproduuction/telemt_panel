@@ -32,6 +32,154 @@ interface ReleasesResult {
 }
 
 const PHASE_STEPS = ['checking', 'downloading', 'verifying', 'replacing', 'restarting'];
+interface AutoUpdateConfig {
+  enabled: boolean;
+  check_interval: string;
+  auto_apply: boolean;
+}
+
+interface AutoUpdateComponentState {
+  config: AutoUpdateConfig;
+  last_check: { current_version: string; latest_version: string; update_available: boolean; release_name: string } | null;
+  last_check_at: string | null;
+}
+
+interface AutoUpdateStatus {
+  panel: AutoUpdateComponentState;
+  telemt: AutoUpdateComponentState;
+}
+
+const INTERVAL_OPTIONS = [
+  { value: '5m', label: '5 минут' },
+  { value: '15m', label: '15 минут' },
+  { value: '30m', label: '30 минут' },
+  { value: '1h', label: '1 час' },
+  { value: '3h', label: '3 часа' },
+  { value: '6h', label: '6 часов' },
+  { value: '12h', label: '12 часов' },
+  { value: '24h', label: '24 часа' },
+];
+
+function AutoUpdateCard({
+  title,
+  state,
+  onSave,
+}: {
+  title: string;
+  state: AutoUpdateComponentState;
+  onSave: (config: AutoUpdateConfig) => void;
+}) {
+  const [enabled, setEnabled] = useState(state.config.enabled);
+  const [interval, setInterval] = useState(state.config.check_interval || '1h');
+  const [autoApply, setAutoApply] = useState(state.config.auto_apply);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setEnabled(state.config.enabled);
+    setInterval(state.config.check_interval || '1h');
+    setAutoApply(state.config.auto_apply);
+  }, [state.config.enabled, state.config.check_interval, state.config.auto_apply]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      onSave({ enabled, check_interval: interval, auto_apply: autoApply });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hasChanges = enabled !== state.config.enabled || interval !== (state.config.check_interval || '1h') || autoApply !== state.config.auto_apply;
+
+  return (
+    <div className="bg-surface rounded-lg p-4 lg:p-5 border border-border">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs lg:text-sm font-semibold text-text-primary">{title}</h3>
+        {state.last_check_at && (
+          <span className="text-[10px] lg:text-xs text-text-secondary">
+            Последняя проверка: {new Date(state.last_check_at).toLocaleString('ru-RU')}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-text-secondary">{enabled ? "Вкл" : "Выкл"}</span>
+          <button
+            onClick={() => setEnabled(!enabled)}
+            className={cn(
+              'relative w-10 h-5 rounded-full transition-colors',
+              enabled ? 'bg-accent' : 'bg-border'
+            )}
+          >
+            <span className={cn(
+              'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform',
+              enabled ? 'left-5' : 'left-0.5'
+            )} />
+          </button>
+        </div>
+
+        {enabled && (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-text-secondary">Интервал проверки</span>
+              <select
+                value={interval}
+                onChange={(e) => setInterval(e.target.value)}
+                className="bg-background text-text-primary rounded px-2 py-1 text-sm border border-border focus:border-accent focus:outline-none"
+              >
+                {INTERVAL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-text-secondary">Автоустановка</span>
+              <button
+                onClick={() => setAutoApply(!autoApply)}
+                className={cn(
+                  'relative w-10 h-5 rounded-full transition-colors',
+                  autoApply ? 'bg-accent' : 'bg-border'
+                )}
+              >
+                <span className={cn(
+                  'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform',
+                  autoApply ? 'left-5' : 'left-0.5'
+                )} />
+              </button>
+            </div>
+          </>
+        )}
+
+        {state.last_check && (
+          <div className="flex items-center gap-2 text-xs">
+            {state.last_check.update_available ? (
+              <span className="text-accent">
+                Доступно: {state.last_check.latest_version}
+              </span>
+            ) : (
+              <span className="text-success">
+                Актуально ({state.last_check.current_version})
+              </span>
+            )}
+          </div>
+        )}
+
+        {hasChanges && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-1.5 text-sm rounded-lg bg-accent text-white hover:bg-accent/90 disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'Сохранение...' : 'Сохранить'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function VersionSelect({
   releases,
@@ -165,6 +313,33 @@ export function UpdatePage() {
   const [panelReleasesError, setPanelReleasesError] = useState('');
   const [panelShowConfirm, setPanelShowConfirm] = useState(false);
 
+  // Auto-update state
+  const [autoStatus, setAutoStatus] = useState<AutoUpdateStatus | null>(null);
+
+  // Fetch auto-update status
+  const fetchAutoStatus = async () => {
+    try {
+      const res = await panelApi.get<AutoUpdateStatus>('/auto-update/status');
+      setAutoStatus(res);
+    } catch {
+      // Ignore - feature may not be available
+    }
+  };
+
+  const handleAutoUpdateConfig = async (component: 'panel' | 'telemt', cfg: AutoUpdateConfig) => {
+    try {
+      const current = autoStatus?.[component]?.config || { enabled: false, check_interval: '1h', auto_apply: false };
+      const payload = {
+        panel: component === 'panel' ? cfg : current,
+        telemt: component === 'telemt' ? cfg : current,
+      };
+      const res = await panelApi.put<AutoUpdateStatus>('/auto-update/config', payload);
+      setAutoStatus(res);
+    } catch (e: any) {
+      alert('Ошибка: ' + (e.message || 'Не удалось сохранить настройки'));
+    }
+  };
+
   const isUpdating = status && !['idle', 'done', 'error'].includes(status.phase);
   const isPanelUpdating = panelStatus && !['idle', 'done', 'error'].includes(panelStatus.phase);
 
@@ -294,6 +469,7 @@ export function UpdatePage() {
   useEffect(() => {
     fetchReleases();
     fetchPanelReleases();
+    fetchAutoStatus();
     return () => {
       stopPolling();
       stopPanelPolling();
@@ -307,6 +483,25 @@ export function UpdatePage() {
     <div className="min-h-screen">
       <Header title="Update" onRefresh={() => { fetchReleases(); fetchPanelReleases(); }} />
       <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 max-w-3xl">
+
+        {/* Auto-update settings */}
+        {autoStatus && (
+          <div className="bg-surface rounded-lg p-4 lg:p-5 border border-border">
+            <h2 className="text-xs lg:text-sm font-semibold text-text-primary mb-3 lg:mb-4">Автообновление</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
+              <AutoUpdateCard
+                title="Panel"
+                state={autoStatus.panel}
+                onSave={(cfg) => handleAutoUpdateConfig('panel', cfg)}
+              />
+              <AutoUpdateCard
+                title="Telemt"
+                state={autoStatus.telemt}
+                onSave={(cfg) => handleAutoUpdateConfig('telemt', cfg)}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Panel Update Section */}
         <div className="bg-surface rounded-lg p-4 lg:p-5 border border-border">

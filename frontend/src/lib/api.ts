@@ -51,6 +51,8 @@ export const panelApi = {
   get: <T>(path: string) => request<T>(PANEL_BASE, path),
   post: <T>(path: string, body?: unknown) =>
     request<T>(PANEL_BASE, path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
+  put: <T>(path: string, body?: unknown) =>
+    request<T>(PANEL_BASE, path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
 };
 
 export const authApi = {
