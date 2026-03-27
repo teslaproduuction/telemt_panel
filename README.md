@@ -161,19 +161,60 @@ go build -ldflags="-s -w -X main.version=1.2.3" -o telemt-panel .
 
 ## Systemd
 
+### Установка скриптом (рекомендуется)
+
+Скрипт автоматически создаёт системного пользователя `telemt`, выделяет изолированные
+директории для бинарников и конфигов, устанавливает polkit-правило для перезапуска
+сервисов и генерирует песочницу systemd-юнит:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/amirotin/telemt_panel/main/install.sh | bash
+```
+
+| Компонент | Путь |
+|-----------|------|
+| Бинарник панели | `/opt/bin/telemt/telemt-panel` |
+| Конфиг панели | `/opt/etc/telemt-panel/config.toml` |
+| Данные (кэш сертификатов и т.д.) | `/var/lib/telemt-panel/` |
+| Systemd-юнит | `/etc/systemd/system/telemt-panel.service` |
+| Polkit-правило | `/etc/polkit-1/rules.d/10-telemt-restart.rules` |
+
+Сгенерированный юнит включает:
+
+```ini
+[Service]
+User=telemt
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/bin/telemt /opt/etc/telemt-panel /var/lib/telemt-panel
+```
+
+Polkit-правило позволяет пользователю `telemt` перезапускать `telemt.service` и
+`telemt-panel.service` без интерактивного запроса пароля.
+
+### Ручная установка от root
+
 ```bash
 sudo cp telemt-panel.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now telemt-panel
 ```
 
-> **Важно:** сервис работает от root. Это необходимо для:
+> **Важно:** при ручной установке сервис работает от root. Это необходимо для:
 > - обновления бинарников в `/usr/local/bin` и `/bin`
 > - редактирования конфига Telemt в `/etc/telemt/`
 > - перезапуска systemd-сервисов (`telemt`, `telemt-panel`)
->
-> Если вам не нужны функции обновления и редактирования конфига, можно запустить от
-> отдельного пользователя — создайте его и добавьте `User=telemt-panel` в секцию `[Service]`.
+
+### Удаление
+
+```bash
+# Только сервис и бинарник (конфиг и данные сохраняются)
+./install.sh uninstall
+
+# Полное удаление (включая пользователя telemt)
+./install.sh purge
+```
 
 Логи:
 
