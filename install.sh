@@ -84,23 +84,42 @@ create_system_user() {
   fi
 }
 
+# ── Check required commands ──────────────────────────────────────────────────
+check_deps() {
+  for _cmd in curl tar openssl; do
+    command -v "$_cmd" >/dev/null 2>&1 || die "Required command '$_cmd' not found. Install it and re-run."
+  done
+  # sha256sum is optional (used for checksum verification)
+  if ! command -v sha256sum >/dev/null 2>&1; then
+    say "WARNING: sha256sum not found - checksum verification will be skipped"
+  fi
+}
+
 # ── Set up directories ──────────────────────────────────────────────────────
 setup_directories() {
   say "Setting up directories..."
   $SUDO mkdir -p "$BIN_DIR"
   $SUDO mkdir -p "$CONFIG_DIR"
   $SUDO mkdir -p "$DATA_DIR"
-  $SUDO chown -R "$SYSTEM_USER:$SYSTEM_USER" "$BIN_DIR"
-  $SUDO chown -R "$SYSTEM_USER:$SYSTEM_USER" "$CONFIG_DIR"
-  $SUDO chown -R "$SYSTEM_USER:$SYSTEM_USER" "$DATA_DIR"
+  $SUDO chown "$SYSTEM_USER:$SYSTEM_USER" "$BIN_DIR"
+  $SUDO chown "$SYSTEM_USER:$SYSTEM_USER" "$CONFIG_DIR"
+  $SUDO chown "$SYSTEM_USER:$SYSTEM_USER" "$DATA_DIR"
 }
 
-# ── Polkit rule for service restart ──────────────────────────────────────────
+# ── Polkit rule for service restart (optional) ──────────────────────────────
 install_polkit_rule() {
   if [ -f "$POLKIT_RULE" ]; then
     say "Polkit rule already exists - skipping"
     return
   fi
+  # Skip if polkit is not installed
+  if ! command -v pkaction >/dev/null 2>&1 && [ ! -d "/etc/polkit-1/rules.d" ]; then
+    say "Polkit not found - skipping rule installation"
+    say "Note: without polkit, the panel cannot restart services as non-root user"
+    say "You can install polkit later and re-run the installer, or use sudo"
+    return
+  fi
+  $SUDO mkdir -p "$(dirname "$POLKIT_RULE")"
   say "Installing polkit rule for service restart..."
   cat <<'POLKIT_EOF' | write_root "$POLKIT_RULE"
 polkit.addRule(function(action, subject) {
@@ -205,6 +224,9 @@ do_install() {
 
   printf '\n  Telemt Panel Installer (hardened mode)\n\n'
 
+  # ── Stage 0: Check dependencies ────────────────────────────────────────
+  check_deps
+
   # ── Stage 1: Create system user and directories ─────────────────────────
   create_system_user
   setup_directories
@@ -238,23 +260,25 @@ do_install() {
     || die "Download failed. Check that version $TAG exists."
 
   # Verify SHA256 checksum if available
-  CHECKSUM_URL="https://github.com/$REPO/releases/download/$TAG/checksums.txt"
-  TMP_CHECKSUMS="/tmp/telemt-panel-checksums.txt"
-  track_tmp "$TMP_CHECKSUMS"
-  if curl -fsSL "$CHECKSUM_URL" -o "$TMP_CHECKSUMS" 2>/dev/null; then
-    say "Verifying SHA256 checksum..."
-    EXPECTED=$(grep "$TARBALL" "$TMP_CHECKSUMS" | awk '{print $1}')
-    if [ -n "$EXPECTED" ]; then
-      ACTUAL=$(sha256sum "$TMP_TAR" | awk '{print $1}')
-      if [ "$EXPECTED" != "$ACTUAL" ]; then
-        die "Checksum mismatch! Expected: $EXPECTED, Got: $ACTUAL"
+  if command -v sha256sum >/dev/null 2>&1; then
+    CHECKSUM_URL="https://github.com/$REPO/releases/download/$TAG/checksums.txt"
+    TMP_CHECKSUMS="/tmp/telemt-panel-checksums.txt"
+    track_tmp "$TMP_CHECKSUMS"
+    if curl -fsSL "$CHECKSUM_URL" -o "$TMP_CHECKSUMS" 2>/dev/null; then
+      say "Verifying SHA256 checksum..."
+      EXPECTED=$(grep "$TARBALL" "$TMP_CHECKSUMS" | awk '{print $1}')
+      if [ -n "$EXPECTED" ]; then
+        ACTUAL=$(sha256sum "$TMP_TAR" | awk '{print $1}')
+        if [ "$EXPECTED" != "$ACTUAL" ]; then
+          die "Checksum mismatch! Expected: $EXPECTED, Got: $ACTUAL"
+        fi
+        say "Checksum OK"
+      else
+        say "WARNING: Checksum file found but no entry for $TARBALL - skipping verification"
       fi
-      say "Checksum OK"
     else
-      say "WARNING: Checksum file found but no entry for $TARBALL - skipping verification"
+      say "WARNING: Checksum file not available - skipping verification"
     fi
-  else
-    say "WARNING: Checksum file not available - skipping verification"
   fi
 
   say "Extracting..."
@@ -293,7 +317,6 @@ do_install() {
     JWT_SECRET=$(openssl rand -hex 32)
 
     # Build config with hardened paths
-    # FIXED: Correctly concatenate the entire config string
     _cfg="listen = \"0.0.0.0:8080\"
 
 [telemt]
