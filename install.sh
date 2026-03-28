@@ -237,6 +237,26 @@ do_install() {
   curl -fSL "$URL" -o "$TMP_TAR" \
     || die "Download failed. Check that version $TAG exists."
 
+  # Verify SHA256 checksum if available
+  CHECKSUM_URL="https://github.com/$REPO/releases/download/$TAG/checksums.txt"
+  TMP_CHECKSUMS="/tmp/telemt-panel-checksums.txt"
+  track_tmp "$TMP_CHECKSUMS"
+  if curl -fsSL "$CHECKSUM_URL" -o "$TMP_CHECKSUMS" 2>/dev/null; then
+    say "Verifying SHA256 checksum..."
+    EXPECTED=$(grep "$TARBALL" "$TMP_CHECKSUMS" | awk '{print $1}')
+    if [ -n "$EXPECTED" ]; then
+      ACTUAL=$(sha256sum "$TMP_TAR" | awk '{print $1}')
+      if [ "$EXPECTED" != "$ACTUAL" ]; then
+        die "Checksum mismatch! Expected: $EXPECTED, Got: $ACTUAL"
+      fi
+      say "Checksum OK"
+    else
+      say "WARNING: Checksum file found but no entry for $TARBALL - skipping verification"
+    fi
+  else
+    say "WARNING: Checksum file not available - skipping verification"
+  fi
+
   say "Extracting..."
   tar -xzf "$TMP_TAR" -C /tmp
   EXTRACTED="/tmp/telemt-panel-${ARCH}-linux"

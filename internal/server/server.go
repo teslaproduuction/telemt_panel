@@ -31,7 +31,33 @@ type loginRateLimiter struct {
 }
 
 func newLoginRateLimiter() *loginRateLimiter {
-	return &loginRateLimiter{attempts: make(map[string][]time.Time)}
+	rl := &loginRateLimiter{attempts: make(map[string][]time.Time)}
+	go rl.cleanup()
+	return rl
+}
+
+// cleanup periodically removes stale entries to prevent unbounded memory growth.
+func (rl *loginRateLimiter) cleanup() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		rl.mu.Lock()
+		now := time.Now()
+		for ip, times := range rl.attempts {
+			valid := times[:0]
+			for _, t := range times {
+				if now.Sub(t) < 5*time.Minute {
+					valid = append(valid, t)
+				}
+			}
+			if len(valid) == 0 {
+				delete(rl.attempts, ip)
+			} else {
+				rl.attempts[ip] = valid
+			}
+		}
+		rl.mu.Unlock()
+	}
 }
 
 // allow returns true if the IP has fewer than maxAttempts in the given window.
@@ -116,8 +142,15 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 	// Auth endpoints
 	mux.HandleFunc("POST /api/auth/login", func(w http.ResponseWriter, r *http.Request) {
 		ip := r.RemoteAddr
+		// Strip port from RemoteAddr (e.g. "1.2.3.4:12345" → "1.2.3.4")
+		if host, _, ok := strings.Cut(ip, ":"); ok {
+			ip = host
+		}
+		// Use only the first (leftmost, client) IP from X-Forwarded-For
 		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-			ip = fwd
+			if first, _, _ := strings.Cut(fwd, ","); first != "" {
+				ip = strings.TrimSpace(first)
+			}
 		}
 
 		if !limiter.allow(ip, 5, 1*time.Minute) {

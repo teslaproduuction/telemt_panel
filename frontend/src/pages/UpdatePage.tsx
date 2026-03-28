@@ -67,7 +67,7 @@ function AutoUpdateCard({
 }: {
   title: string;
   state: AutoUpdateComponentState;
-  onSave: (config: AutoUpdateConfig) => void;
+  onSave: (config: AutoUpdateConfig) => Promise<void>;
 }) {
   const [enabled, setEnabled] = useState(state.config.enabled);
   const [interval, setInterval] = useState(state.config.check_interval || '1h');
@@ -83,7 +83,7 @@ function AutoUpdateCard({
   const handleSave = async () => {
     setSaving(true);
     try {
-      onSave({ enabled, check_interval: interval, auto_apply: autoApply });
+      await onSave({ enabled, check_interval: interval, auto_apply: autoApply });
     } finally {
       setSaving(false);
     }

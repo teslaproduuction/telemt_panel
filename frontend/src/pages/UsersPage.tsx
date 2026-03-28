@@ -81,19 +81,29 @@ interface LinkEntry {
   label: string;
 }
 
+function appendComment(raw: string, username: string): string {
+  try {
+    const u = new URL(raw);
+    u.searchParams.set('comment', username);
+    return u.toString();
+  } catch {
+    // Fallback: URL may be a protocol link (e.g. ss://...), append as query
+    const sep = raw.includes('?') ? '&' : '?';
+    return raw + sep + 'comment=' + encodeURIComponent(username);
+  }
+}
+
 function collectLinks(links?: UserLinks, username?: string): LinkEntry[] {
   const result: LinkEntry[] = [];
   if (!links) return result;
-  const suffix = username ? `&comment=${encodeURIComponent(username)}` : '';
-  if (links.tls) {
-    for (const url of links.tls) result.push({ url: url + suffix, label: 'TLS' });
-  }
-  if (links.secure) {
-    for (const url of links.secure) result.push({ url: url + suffix, label: 'Secure' });
-  }
-  if (links.classic) {
-    for (const url of links.classic) result.push({ url: url + suffix, label: 'Classic' });
-  }
+  const addLinks = (urls: string[], label: string) => {
+    for (const url of urls) {
+      result.push({ url: username ? appendComment(url, username) : url, label });
+    }
+  };
+  if (links.tls) addLinks(links.tls, 'TLS');
+  if (links.secure) addLinks(links.secure, 'Secure');
+  if (links.classic) addLinks(links.classic, 'Classic');
   return result;
 }
 
