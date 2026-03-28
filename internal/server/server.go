@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/telemt/telemt-panel/internal/auth"
+	"github.com/telemt/telemt-panel/internal/auto_update"
 	"github.com/telemt/telemt-panel/internal/config"
 	"github.com/telemt/telemt-panel/internal/geoip"
 	"github.com/telemt/telemt-panel/internal/logs"
@@ -280,6 +281,69 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 
 	mux.Handle("GET /api/panel/update/status", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: panelUpd.GetStatus()})
+	})))
+
+	// Auto-update manager
+	autoMgr := auto_update.New()
+	autoMgr.Register("panel", auto_update.Component{
+		CheckFn: func() (*auto_update.CheckResult, error) {
+			r, err := panelUpd.Check()
+			if err != nil {
+				return nil, err
+			}
+			return &auto_update.CheckResult{
+				CurrentVersion:  r.CurrentVersion,
+				LatestVersion:   r.LatestVersion,
+				UpdateAvailable: r.UpdateAvailable,
+				ReleaseName:     r.ReleaseName,
+				ReleaseURL:      r.ReleaseURL,
+				PublishedAt:     r.PublishedAt,
+				Changelog:       r.Changelog,
+			}, nil
+		},
+		ApplyFn: func(version string) error { return panelUpd.Apply(version) },
+	}, auto_update.ComponentConfig{
+		Enabled:       s.cfg.Panel.AutoUpdate.Enabled,
+		CheckInterval: s.cfg.Panel.AutoUpdate.CheckInterval,
+		AutoApply:     s.cfg.Panel.AutoUpdate.AutoApply,
+	})
+	autoMgr.Register("telemt", auto_update.Component{
+		CheckFn: func() (*auto_update.CheckResult, error) {
+			r, err := upd.Check()
+			if err != nil {
+				return nil, err
+			}
+			return &auto_update.CheckResult{
+				CurrentVersion:  r.CurrentVersion,
+				LatestVersion:   r.LatestVersion,
+				UpdateAvailable: r.UpdateAvailable,
+				ReleaseName:     r.ReleaseName,
+				ReleaseURL:      r.ReleaseURL,
+				PublishedAt:     r.PublishedAt,
+				Changelog:       r.Changelog,
+			}, nil
+		},
+		ApplyFn: func(version string) error { return upd.Apply(version) },
+	}, auto_update.ComponentConfig{
+		Enabled:       s.cfg.Telemt.AutoUpdate.Enabled,
+		CheckInterval: s.cfg.Telemt.AutoUpdate.CheckInterval,
+		AutoApply:     s.cfg.Telemt.AutoUpdate.AutoApply,
+	})
+	defer autoMgr.StopAll()
+
+	// Auto-update API
+	mux.Handle("GET /api/auto-update/status", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: autoMgr.GetStatus()})
+	})))
+	mux.Handle("PUT /api/auto-update/config", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req auto_update.UpdateConfigRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "invalid request body")
+			return
+		}
+		autoMgr.UpdateConfig("panel", req.Panel)
+		autoMgr.UpdateConfig("telemt", req.Telemt)
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: autoMgr.GetStatus()})
 	})))
 
 	// Telemt service restart endpoint

@@ -5,10 +5,36 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"golang.org/x/crypto/bcrypt"
 )
+
+
+// AutoUpdateConfig controls automatic update checking for a component.
+type AutoUpdateConfig struct {
+	Enabled       bool   `toml:"enabled"`
+	CheckInterval string `toml:"check_interval"` // Go duration, e.g. "1h", "30m"
+	AutoApply     bool   `toml:"auto_apply"`
+}
+
+// Interval returns the parsed check interval, defaulting to 1h on parse error.
+func (c AutoUpdateConfig) Interval() time.Duration {
+	if c.CheckInterval == "" {
+		return 1 * time.Hour
+	}
+	d, err := time.ParseDuration(c.CheckInterval)
+	if err != nil {
+		log.Printf("auto_update: invalid check_interval %q, defaulting to 1h: %s", c.CheckInterval, err)
+		return 1 * time.Hour
+	}
+	if d < 5*time.Minute {
+		log.Printf("auto_update: check_interval %v too low, minimum is 5m", d)
+		return 5 * time.Minute
+	}
+	return d
+}
 
 type Config struct {
 	Listen   string       `toml:"listen"`
@@ -40,6 +66,7 @@ type TelemtConfig struct {
 	GithubRepo    string `toml:"github_repo"`
 	ConfigPath    string `toml:"config_path"`
 	ContainerName string `toml:"container_name"`
+	AutoUpdate    AutoUpdateConfig `toml:"auto_update"`
 }
 
 type PanelConfig struct {
@@ -48,6 +75,7 @@ type PanelConfig struct {
 	GithubRepo       string `toml:"github_repo"`
 	MaxNewerReleases int    `toml:"max_newer_releases"`
 	MaxOlderReleases int    `toml:"max_older_releases"`
+	AutoUpdate       AutoUpdateConfig `toml:"auto_update"`
 }
 
 type AuthConfig struct {
@@ -109,6 +137,10 @@ func Load(path string) (*Config, error) {
 	if cfg.Panel.GithubRepo == "" {
 		cfg.Panel.GithubRepo = "amirotin/telemt_panel"
 	}
+
+	// Validate auto-update intervals
+	_ = cfg.Telemt.AutoUpdate.Interval()
+	_ = cfg.Panel.AutoUpdate.Interval()
 
 	// Normalize base_path: ensure leading slash, strip trailing slash
 	cfg.BasePath = strings.TrimRight(cfg.BasePath, "/")

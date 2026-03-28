@@ -30,6 +30,11 @@ auth_header = "your-telemt-api-secret"
 # Docker container name (if Telemt runs in Docker)
 # container_name = "telemt"
 
+# [telemt.auto_update]
+# enabled = false
+# check_interval = "1h"  # Go duration: 5m, 30m, 1h, 6h, 24h (min: 5m)
+# auto_apply = true       # automatically install stable updates
+
 [panel]
 # Path to telemt-panel binary (default: /usr/local/bin/telemt-panel)
 # For non-root installation: binary_path = "/opt/bin/telemt/telemt-panel"
@@ -38,6 +43,11 @@ auth_header = "your-telemt-api-secret"
 # service_name = "telemt-panel"
 # GitHub repository for update checks (default: amirotin/telemt_panel)
 # github_repo = "amirotin/telemt_panel"
+
+# [panel.auto_update]
+# enabled = false
+# check_interval = "1h"
+# auto_apply = false      # panel restart kills sessions, use with caution
 # Maximum number of newer/older releases shown in update selector (default: 10)
 # max_newer_releases = 10
 # max_older_releases = 10
