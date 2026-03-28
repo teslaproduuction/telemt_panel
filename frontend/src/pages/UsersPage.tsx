@@ -187,10 +187,16 @@ export function UsersPage() {
   const [deleteUser, setDeleteUser] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState('');
-  const [userDefaults, setUserDefaults] = useState<Record<string, unknown>>({});
+  const [userDefaults, setUserDefaults] = useState<{
+    user_ad_tag?: string;
+    max_tcp_conns?: number;
+    data_quota_bytes?: number;
+    max_unique_ips?: number;
+    expiration_rfc3339?: string;
+  }>({});
 
   useEffect(() => {
-    panelApi.get<Record<string, unknown>>('/users/defaults')
+    panelApi.get<typeof userDefaults>('/users/defaults')
       .then(setUserDefaults)
       .catch((e) => console.warn('Failed to load user defaults:', e));
   }, []);

@@ -37,12 +37,11 @@ func (c AutoUpdateConfig) Interval() time.Duration {
 }
 
 type UsersConfig struct {
-	DefaultSecret         string `toml:"default_secret"`
-	DefaultUserAdTag      string `toml:"default_user_ad_tag"`
-	DefaultMaxTcpConns    int    `toml:"default_max_tcp_conns"`
-	DefaultDataQuotaBytes int64  `toml:"default_data_quota_bytes"`
-	DefaultMaxUniqueIps   int    `toml:"default_max_unique_ips"`
-	DefaultExpiration     string `toml:"default_expiration"`
+	UserAdTag      string `toml:"ad_tag" json:"user_ad_tag,omitempty"`
+	MaxTcpConns    int    `toml:"max_tcp_conns" json:"max_tcp_conns,omitempty"`
+	DataQuotaBytes int64  `toml:"data_quota_bytes" json:"data_quota_bytes,omitempty"`
+	MaxUniqueIps   int    `toml:"max_unique_ips" json:"max_unique_ips,omitempty"`
+	Expiration     string `toml:"expiration" json:"expiration_rfc3339,omitempty"`
 }
 
 type Config struct {
@@ -153,9 +152,9 @@ func Load(path string) (*Config, error) {
 	_ = cfg.Panel.AutoUpdate.Interval()
 
 	// Validate user defaults
-	if cfg.Users.DefaultExpiration != "" {
-		if _, err := time.Parse(time.RFC3339, cfg.Users.DefaultExpiration); err != nil {
-			return nil, fmt.Errorf("users.default_expiration: invalid RFC3339 format: %w", err)
+	if cfg.Users.Expiration != "" {
+		if _, err := time.Parse(time.RFC3339, cfg.Users.Expiration); err != nil {
+			return nil, fmt.Errorf("users.expiration: invalid RFC3339 format: %w", err)
 		}
 	}
 

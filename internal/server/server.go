@@ -222,26 +222,7 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 
 	// User defaults endpoint
 	mux.Handle("GET /api/users/defaults", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defaults := map[string]interface{}{}
-		if s.cfg.Users.DefaultSecret != "" {
-			defaults["secret"] = s.cfg.Users.DefaultSecret
-		}
-		if s.cfg.Users.DefaultUserAdTag != "" {
-			defaults["user_ad_tag"] = s.cfg.Users.DefaultUserAdTag
-		}
-		if s.cfg.Users.DefaultMaxTcpConns > 0 {
-			defaults["max_tcp_conns"] = s.cfg.Users.DefaultMaxTcpConns
-		}
-		if s.cfg.Users.DefaultDataQuotaBytes > 0 {
-			defaults["data_quota_bytes"] = s.cfg.Users.DefaultDataQuotaBytes
-		}
-		if s.cfg.Users.DefaultMaxUniqueIps > 0 {
-			defaults["max_unique_ips"] = s.cfg.Users.DefaultMaxUniqueIps
-		}
-		if s.cfg.Users.DefaultExpiration != "" {
-			defaults["expiration_rfc3339"] = s.cfg.Users.DefaultExpiration
-		}
-		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: defaults})
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: s.cfg.Users})
 	})))
 
 	// WebSocket endpoint (auth checked via cookie on upgrade)
