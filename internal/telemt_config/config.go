@@ -46,6 +46,11 @@ func SaveConfig(configPath, content string) (newHash string, err error) {
 	// Strip underscores from integer literals (e.g. 8_443 → 8443)
 	content = removeIntegerUnderscores(content)
 
+	// Convert inline empty tables (e.g. `key = {}`) to proper TOML sections.
+	// Telemt does not understand inline empty tables and they cause duplicate
+	// key errors when Telemt rewrites the config on hot-reload.
+	content = inlineTablesToSections(content)
+
 	// Create backup
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := fmt.Sprintf("%s.backup.%s", configPath, timestamp)
@@ -131,10 +136,6 @@ func QuickUpdate(configPath string, updates map[string]interface{}) (newHash str
 
 	// Remove underscores from integer literals (go-toml/v2 formats 8443 as 8_443)
 	cleaned := removeIntegerUnderscores(string(newContent))
-
-	// Convert inline empty tables like `key = {}` to proper TOML sections
-	// Telemt doesn't understand inline empty tables
-	cleaned = inlineTablesToSections(cleaned)
 
 	// Save
 	return SaveConfig(configPath, cleaned)
