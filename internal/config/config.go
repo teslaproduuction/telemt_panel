@@ -36,6 +36,15 @@ func (c AutoUpdateConfig) Interval() time.Duration {
 	return d
 }
 
+type UsersConfig struct {
+	DefaultSecret         string `toml:"default_secret"`
+	DefaultUserAdTag      string `toml:"default_user_ad_tag"`
+	DefaultMaxTcpConns    int    `toml:"default_max_tcp_conns"`
+	DefaultDataQuotaBytes int64  `toml:"default_data_quota_bytes"`
+	DefaultMaxUniqueIps   int    `toml:"default_max_unique_ips"`
+	DefaultExpiration     string `toml:"default_expiration"`
+}
+
 type Config struct {
 	Listen   string       `toml:"listen"`
 	BasePath string       `toml:"base_path"`
@@ -44,6 +53,7 @@ type Config struct {
 	Auth     AuthConfig   `toml:"auth"`
 	TLS      TLSConfig    `toml:"tls"`
 	GeoIP    GeoIPConfig  `toml:"geoip"`
+	Users    UsersConfig  `toml:"users"`
 }
 
 type GeoIPConfig struct {
@@ -141,6 +151,13 @@ func Load(path string) (*Config, error) {
 	// Validate auto-update intervals
 	_ = cfg.Telemt.AutoUpdate.Interval()
 	_ = cfg.Panel.AutoUpdate.Interval()
+
+	// Validate user defaults
+	if cfg.Users.DefaultExpiration != "" {
+		if _, err := time.Parse(time.RFC3339, cfg.Users.DefaultExpiration); err != nil {
+			return nil, fmt.Errorf("users.default_expiration: invalid RFC3339 format: %w", err)
+		}
+	}
 
 	// Normalize base_path: ensure leading slash, strip trailing slash
 	cfg.BasePath = strings.TrimRight(cfg.BasePath, "/")

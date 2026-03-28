@@ -81,3 +81,13 @@ password_hash = "$2a$10$CHANGE_ME"
 jwt_secret = "change-me-to-a-random-string-at-least-32-chars"
 # Session duration
 session_ttl = "24h"
+
+[users]
+# Default values for new user creation form
+# These are pre-filled when clicking "Create User"
+# default_secret = ""
+# default_user_ad_tag = ""
+# default_max_tcp_conns = 0
+# default_data_quota_bytes = 0
+# default_max_unique_ips = 0
+# default_expiration = "2027-12-31T23:59:59Z"
