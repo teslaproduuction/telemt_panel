@@ -81,17 +81,18 @@ interface LinkEntry {
   label: string;
 }
 
-function collectLinks(links?: UserLinks): LinkEntry[] {
+function collectLinks(links?: UserLinks, username?: string): LinkEntry[] {
   const result: LinkEntry[] = [];
   if (!links) return result;
+  const suffix = username ? `&comment=${encodeURIComponent(username)}` : '';
   if (links.tls) {
-    for (const url of links.tls) result.push({ url, label: 'TLS' });
+    for (const url of links.tls) result.push({ url: url + suffix, label: 'TLS' });
   }
   if (links.secure) {
-    for (const url of links.secure) result.push({ url, label: 'Secure' });
+    for (const url of links.secure) result.push({ url: url + suffix, label: 'Secure' });
   }
   if (links.classic) {
-    for (const url of links.classic) result.push({ url, label: 'Classic' });
+    for (const url of links.classic) result.push({ url: url + suffix, label: 'Classic' });
   }
   return result;
 }
@@ -279,7 +280,7 @@ export function UsersPage() {
                   </TableRow>
                 ) : (
                   pagedUsers.map((u) => {
-                    const allLinks = collectLinks(u.links);
+                    const allLinks = collectLinks(u.links, u.username);
                     const hasConns = u.current_connections > 0;
 
                     return (
@@ -362,7 +363,7 @@ export function UsersPage() {
             </div>
           ) : (
             pagedUsers.map((u) => {
-              const allLinks = collectLinks(u.links);
+              const allLinks = collectLinks(u.links, u.username);
               const hasConns = u.current_connections > 0;
 
               return (
