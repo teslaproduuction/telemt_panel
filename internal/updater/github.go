@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/telemt/telemt-panel/internal/github"
+	"github.com/telemt/telemt-panel/internal/sysutil"
 )
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
@@ -19,9 +20,26 @@ func archString() string {
 	return "x86_64"
 }
 
-// AssetName returns the expected binary asset filename for this architecture.
+// binaryPath is set externally to allow variant auto-detection against the installed binary.
+var detectedVariant string
+
+// SetBinaryPathForDetection sets the binary path used for libc variant detection.
+// Must be called before AssetName() is used.
+func SetBinaryPathForDetection(path string) {
+	detectedVariant = sysutil.DetectVariant(path)
+}
+
+// Variant returns the detected libc variant ("musl" or "gnu").
+func Variant() string {
+	if detectedVariant != "" {
+		return detectedVariant
+	}
+	return "musl" // safe default
+}
+
+// AssetName returns the expected binary asset filename for this architecture and libc variant.
 func AssetName() string {
-	return "telemt-" + archString() + "-linux-gnu.tar.gz"
+	return "telemt-" + archString() + "-linux-" + Variant() + ".tar.gz"
 }
 
 // NewAssetMatcher returns an AssetMatcher that finds Telemt binary and checksum assets.

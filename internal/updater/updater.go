@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/telemt/telemt-panel/internal/github"
+	"github.com/telemt/telemt-panel/internal/sysutil"
 )
 
 type Phase string
@@ -55,13 +56,24 @@ type Updater struct {
 	releaseLimits  github.ReleaseLimits
 }
 
-func New(telemtURL, binaryPath, serviceName, githubRepo, authHeader string, maxNewer, maxOlder int) *Updater {
+func New(telemtURL, binaryPath, serviceName, githubRepo, authHeader, dataDir string, maxNewer, maxOlder int) *Updater {
 	if maxNewer <= 0 {
 		maxNewer = github.DefaultMaxNewerReleases
 	}
 	if maxOlder <= 0 {
 		maxOlder = github.DefaultMaxOlderReleases
 	}
+
+	// Initialize staging dir and variant detection
+	if dataDir != "" {
+		if dir, err := sysutil.EnsureStagingDir(dataDir); err == nil {
+			SetStagingDir(dir)
+		} else {
+			log.Printf("[updater] WARNING: staging dir setup failed: %s, using system temp", err)
+		}
+	}
+	SetBinaryPathForDetection(binaryPath)
+
 	return &Updater{
 		status:      Status{Phase: PhaseIdle},
 		telemtURL:   telemtURL,
@@ -225,7 +237,7 @@ func (u *Updater) Apply(version string) error {
 
 func (u *Updater) applyAsync(version string) {
 	u.appendLog(fmt.Sprintf("config: binary_path=%s, service=%s, repo=%s", u.binaryPath, u.serviceName, u.githubRepo))
-	u.appendLog(fmt.Sprintf("arch: asset=%s", AssetName()))
+	u.appendLog(fmt.Sprintf("arch: asset=%s, variant=%s, sudo=%v", AssetName(), Variant(), sysutil.NeedsSudo(u.binaryPath)))
 
 	u.setStatus(PhaseChecking, "fetching current version")
 
@@ -312,17 +324,22 @@ func (u *Updater) applyAsync(version string) {
 	}
 	u.appendLog("sha256 checksum verified OK")
 
-	// Backup current binary
+	// Backup current binary (to staging dir, always writable)
 	u.setStatus(PhaseReplacing, fmt.Sprintf("backing up %s", u.binaryPath))
-	if err := BackupBinary(u.binaryPath); err != nil {
+	backupPath, err := BackupBinary(u.binaryPath)
+	if err != nil {
 		os.Remove(tarPath)
 		os.Remove(shaPath)
 		u.setError(fmt.Errorf("backup %s: %w", u.binaryPath, err))
 		return
 	}
-	u.appendLog("backup created")
+	if backupPath != "" {
+		u.appendLog(fmt.Sprintf("backup created: %s", backupPath))
+	} else {
+		u.appendLog("no existing binary to backup")
+	}
 
-	// Extract new binary
+	// Extract new binary (extracts to staging, then installs with sudo if needed)
 	u.setStatus(PhaseReplacing, fmt.Sprintf("extracting to %s", u.binaryPath))
 	if err := ExtractBinary(tarPath, u.binaryPath); err != nil {
 		os.Remove(tarPath)
@@ -340,17 +357,19 @@ func (u *Updater) applyAsync(version string) {
 		u.appendLog(fmt.Sprintf("new binary written: %s (%d bytes, mode %s)", u.binaryPath, newInfo.Size(), newInfo.Mode()))
 	}
 
-	// Restart service
+	// Restart service (uses sudo if needed)
 	u.setStatus(PhaseRestarting, fmt.Sprintf("running: systemctl restart %s", u.serviceName))
 	if err := RestartService(u.serviceName); err != nil {
 		u.appendLog(fmt.Sprintf("restart failed: %s, rolling back", err))
-		if rbErr := RestoreBackup(u.binaryPath); rbErr != nil {
-			u.setError(fmt.Errorf("restart failed (%w) AND rollback failed (%s)", err, rbErr))
-			return
+		if backupPath != "" {
+			if rbErr := RestoreBackup(backupPath, u.binaryPath); rbErr != nil {
+				u.setError(fmt.Errorf("restart failed (%w) AND rollback failed (%s)", err, rbErr))
+				return
+			}
+			u.appendLog("rollback complete, restarting with old binary")
+			RestartService(u.serviceName)
+			RemoveBackup(backupPath)
 		}
-		u.appendLog("rollback complete, restarting with old binary")
-		RestartService(u.serviceName)
-		RemoveBackup(u.binaryPath) // Clean up backup after rollback
 		u.setError(fmt.Errorf("restart failed, rolled back: %w", err))
 		return
 	}
@@ -362,23 +381,27 @@ func (u *Updater) applyAsync(version string) {
 		u.appendLog(fmt.Sprintf("healthcheck: %s", msg))
 	}); err != nil {
 		u.appendLog(fmt.Sprintf("healthcheck failed: %s, rolling back", err))
-		if rbErr := RestoreBackup(u.binaryPath); rbErr != nil {
-			u.setError(fmt.Errorf("healthcheck failed (%w) AND rollback failed (%s)", err, rbErr))
-			return
+		if backupPath != "" {
+			if rbErr := RestoreBackup(backupPath, u.binaryPath); rbErr != nil {
+				u.setError(fmt.Errorf("healthcheck failed (%w) AND rollback failed (%s)", err, rbErr))
+				return
+			}
+			u.appendLog("rollback complete, restarting with old binary")
+			RestartService(u.serviceName)
+			RemoveBackup(backupPath)
 		}
-		u.appendLog("rollback complete, restarting with old binary")
-		RestartService(u.serviceName)
-		RemoveBackup(u.binaryPath) // Clean up backup after rollback
 		u.setError(fmt.Errorf("healthcheck failed, rolled back: %w", err))
 		return
 	}
 	u.appendLog("healthcheck passed")
 
 	// Remove backup after successful update
-	if err := RemoveBackup(u.binaryPath); err != nil {
-		u.appendLog(fmt.Sprintf("warning: failed to remove backup: %s", err))
-	} else {
-		u.appendLog("backup removed")
+	if backupPath != "" {
+		if err := RemoveBackup(backupPath); err != nil {
+			u.appendLog(fmt.Sprintf("warning: failed to remove backup: %s", err))
+		} else {
+			u.appendLog("backup removed")
+		}
 	}
 
 	// Verify version

@@ -13,10 +13,31 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/telemt/telemt-panel/internal/sysutil"
 )
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 var downloadClient = &http.Client{Timeout: 5 * time.Minute}
+
+// stagingDir is set by the updater to control where downloads and backups go.
+var stagingDir string
+
+// SetStagingDir configures the directory used for downloads and backups.
+func SetStagingDir(dir string) {
+	stagingDir = dir
+}
+
+func downloadDir() string {
+	if stagingDir != "" {
+		return stagingDir
+	}
+	return os.TempDir()
+}
+
+func stagedBackupPath(binaryPath string) string {
+	return filepath.Join(downloadDir(), filepath.Base(binaryPath)+".bak")
+}
 
 func DownloadFile(url string) (string, error) {
 	req, err := http.NewRequest("GET", url, nil)
@@ -34,7 +55,7 @@ func DownloadFile(url string) (string, error) {
 		return "", fmt.Errorf("download returned status %d", resp.StatusCode)
 	}
 
-	tmp, err := os.CreateTemp("", "panel-update-*")
+	tmp, err := os.CreateTemp(downloadDir(), "panel-update-*")
 	if err != nil {
 		return "", err
 	}
@@ -69,6 +90,8 @@ func VerifySha256(path string, expectedLine string) error {
 	return nil
 }
 
+// ExtractBinary extracts the first regular file from the tar.gz archive
+// into the staging directory, then installs it to destPath (using sudo if needed).
 func ExtractBinary(tarGzPath, destPath string) error {
 	f, err := os.Open(tarGzPath)
 	if err != nil {
@@ -95,8 +118,9 @@ func ExtractBinary(tarGzPath, destPath string) error {
 			continue
 		}
 
-		// Create temp file next to destination so rename is same-filesystem
-		tmp, err := os.CreateTemp(filepath.Dir(destPath), ".panel-update-*")
+		// Extract to staging dir (always writable)
+		extractDir := downloadDir()
+		tmp, err := os.CreateTemp(extractDir, ".panel-extract-*")
 		if err != nil {
 			return err
 		}
@@ -114,77 +138,47 @@ func ExtractBinary(tarGzPath, destPath string) error {
 			return err
 		}
 
-		if err := os.Rename(tmpName, destPath); err != nil {
+		// Install to destination (uses sudo if we can't write to dest dir)
+		if err := sysutil.InstallBinary(tmpName, destPath); err != nil {
 			os.Remove(tmpName)
 			return err
 		}
+		os.Remove(tmpName)
 		return nil
 	}
 }
 
-func backupPath(binaryPath string) string {
+// BackupBinary creates a backup of the binary in the staging directory.
+func BackupBinary(binaryPath string) (string, error) {
+	return sysutil.BackupBinary(binaryPath, downloadDir())
+}
+
+// RestoreBackup restores binaryPath from the given backup file.
+func RestoreBackup(backupPath, binaryPath string) error {
+	return sysutil.RestoreBackup(backupPath, binaryPath)
+}
+
+// RemoveBackup removes the backup file.
+func RemoveBackup(backupPath string) error {
+	return sysutil.RemoveFile(backupPath)
+}
+
+// RestartService restarts a systemd service, using sudo if needed.
+func RestartService(serviceName string) error {
+	return sysutil.RestartService(serviceName)
+}
+
+// backupPathLegacy returns the old-style backup path next to the binary.
+func backupPathLegacy(binaryPath string) string {
 	return binaryPath + ".bak"
 }
 
-func BackupBinary(binaryPath string) error {
-	src, err := os.Open(binaryPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	defer src.Close()
-
-	dst, err := os.Create(backupPath(binaryPath))
-	if err != nil {
-		return err
-	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, src); err != nil {
-		return err
-	}
-
-	info, err := os.Stat(binaryPath)
-	if err != nil {
-		return err
-	}
-	return os.Chmod(backupPath(binaryPath), info.Mode())
-}
-
-func RestoreBackup(binaryPath string) error {
-	return os.Rename(backupPath(binaryPath), binaryPath)
-}
-
-func RemoveBackup(binaryPath string) error {
-	err := os.Remove(backupPath(binaryPath))
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return nil
-}
-
-func RestartService(serviceName string) error {
-	if !isValidServiceName(serviceName) {
-		return fmt.Errorf("invalid service name: %q", serviceName)
-	}
-	cmd := exec.Command("systemctl", "restart", serviceName)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("systemctl restart failed: %s: %w", string(output), err)
-	}
-	return nil
-}
-
-func isValidServiceName(name string) bool {
-	if name == "" || len(name) > 256 {
-		return false
-	}
-	for _, c := range name {
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.') {
-			return false
+// CleanupLegacyBackup removes old-style .bak file next to the binary.
+func CleanupLegacyBackup(binaryPath string) {
+	p := backupPathLegacy(binaryPath)
+	if _, err := os.Stat(p); err == nil {
+		if os.Remove(p) != nil {
+			_ = exec.Command("sudo", "rm", "-f", p).Run()
 		}
 	}
-	return true
 }

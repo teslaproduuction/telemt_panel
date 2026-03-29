@@ -236,6 +236,7 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		s.cfg.Telemt.ServiceName,
 		s.cfg.Telemt.GithubRepo,
 		s.cfg.Telemt.AuthHeader,
+		s.cfg.DataDir,
 		s.cfg.Panel.MaxNewerReleases,
 		s.cfg.Panel.MaxOlderReleases,
 	)
@@ -282,6 +283,7 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		s.cfg.Panel.BinaryPath,
 		s.cfg.Panel.ServiceName,
 		s.cfg.Panel.GithubRepo,
+		s.cfg.DataDir,
 		s.cfg.Panel.MaxNewerReleases,
 		s.cfg.Panel.MaxOlderReleases,
 	)

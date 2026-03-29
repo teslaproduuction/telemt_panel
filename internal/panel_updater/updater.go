@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/telemt/telemt-panel/internal/github"
+	"github.com/telemt/telemt-panel/internal/sysutil"
 )
 
 type Phase string
@@ -49,9 +51,11 @@ type Updater struct {
 	serviceName    string
 	githubRepo     string
 	releaseLimits  github.ReleaseLimits
+	statusFilePath string
 }
 
-const statusFilePath = "/tmp/telemt-panel-update-status.json"
+const legacyStatusFileName = "telemt-panel-update-status.json"
+const statusFileName = "panel-update-status.json"
 
 func (u *Updater) saveStatusToFile(s Status) {
 	data, err := json.Marshal(s)
@@ -59,40 +63,71 @@ func (u *Updater) saveStatusToFile(s Status) {
 		log.Printf("[panel_updater] failed to marshal status: %s", err)
 		return
 	}
-	if err := os.WriteFile(statusFilePath, data, 0644); err != nil {
+	if err := os.WriteFile(u.statusFilePath, data, 0644); err != nil {
 		log.Printf("[panel_updater] failed to write status file: %s", err)
 	}
 }
 
-func (u *Updater) loadStatusFromFile() {
-	data, err := os.ReadFile(statusFilePath)
+func (u *Updater) loadStatusFromFile() bool {
+	paths := []string{u.statusFilePath}
+	legacyPath := filepath.Join(os.TempDir(), legacyStatusFileName)
+	if legacyPath != u.statusFilePath {
+		paths = append(paths, legacyPath)
+	}
+
+	for _, path := range paths {
+		if u.loadStatusFromPath(path) {
+			return true
+		}
+	}
+	return false
+}
+
+func (u *Updater) loadStatusFromPath(path string) bool {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			log.Printf("[panel_updater] failed to read status file: %s", err)
+			log.Printf("[panel_updater] failed to read status file %s: %s", path, err)
 		}
-		return
+		return false
 	}
 	var s Status
 	if err := json.Unmarshal(data, &s); err != nil {
-		log.Printf("[panel_updater] failed to unmarshal status: %s", err)
-		return
+		log.Printf("[panel_updater] failed to unmarshal status from %s: %s", path, err)
+		return false
 	}
 	u.mu.Lock()
 	u.status = s
 	u.mu.Unlock()
-	log.Printf("[panel_updater] loaded status from file: phase=%s", s.Phase)
+	log.Printf("[panel_updater] loaded status from file %s: phase=%s", path, s.Phase)
 
 	// Clean up status file after loading
-	os.Remove(statusFilePath)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		log.Printf("[panel_updater] failed to remove status file %s: %s", path, err)
+	}
+	return true
 }
 
-func New(currentVersion, binaryPath, serviceName, githubRepo string, maxNewer, maxOlder int) *Updater {
+func New(currentVersion, binaryPath, serviceName, githubRepo, dataDir string, maxNewer, maxOlder int) *Updater {
 	if maxNewer <= 0 {
 		maxNewer = github.DefaultMaxNewerReleases
 	}
 	if maxOlder <= 0 {
 		maxOlder = github.DefaultMaxOlderReleases
 	}
+
+	// Initialize staging dir and variant detection
+	statusFile := filepath.Join(os.TempDir(), legacyStatusFileName)
+	if dataDir != "" {
+		if dir, err := sysutil.EnsureStagingDir(dataDir); err == nil {
+			SetStagingDir(dir)
+			statusFile = filepath.Join(dataDir, statusFileName)
+		} else {
+			log.Printf("[panel_updater] WARNING: staging dir setup failed: %s, using system temp", err)
+		}
+	}
+	SetBinaryPathForDetection(binaryPath)
+
 	u := &Updater{
 		status:         Status{Phase: PhaseIdle},
 		currentVersion: currentVersion,
@@ -100,12 +135,17 @@ func New(currentVersion, binaryPath, serviceName, githubRepo string, maxNewer, m
 		serviceName:    serviceName,
 		githubRepo:     githubRepo,
 		releaseLimits:  github.ReleaseLimits{MaxNewer: maxNewer, MaxOlder: maxOlder},
+		statusFilePath: statusFile,
 	}
 	// Try to load status from previous session (in case of restart during update)
-	u.loadStatusFromFile()
+	if u.loadStatusFromFile() && u.GetStatus().Phase == PhaseDone {
+		if err := RemoveBackup(stagedBackupPath(binaryPath)); err != nil {
+			log.Printf("[panel_updater] failed to remove recovered backup: %s", err)
+		}
+	}
 
-	// Clean up any leftover backup from previous update
-	RemoveBackup(binaryPath)
+	// Clean up any leftover legacy backup (old-style .bak next to binary)
+	CleanupLegacyBackup(binaryPath)
 
 	return u
 }
@@ -195,7 +235,7 @@ func (u *Updater) Apply(version string) error {
 
 func (u *Updater) applyAsync(version string) {
 	u.appendLog(fmt.Sprintf("config: binary_path=%s, service=%s, repo=%s", u.binaryPath, u.serviceName, u.githubRepo))
-	u.appendLog(fmt.Sprintf("arch: asset=%s", AssetName()))
+	u.appendLog(fmt.Sprintf("arch: asset=%s, variant=%s, sudo=%v", AssetName(), Variant(), sysutil.NeedsSudo(u.binaryPath)))
 
 	u.setStatus(PhaseChecking, "fetching release")
 
@@ -275,17 +315,22 @@ func (u *Updater) applyAsync(version string) {
 	}
 	u.appendLog("sha256 checksum verified OK")
 
-	// Backup current binary
+	// Backup current binary (to staging dir, always writable)
 	u.setStatus(PhaseReplacing, fmt.Sprintf("backing up %s", u.binaryPath))
-	if err := BackupBinary(u.binaryPath); err != nil {
+	backupPath, err := BackupBinary(u.binaryPath)
+	if err != nil {
 		os.Remove(tarPath)
 		os.Remove(shaPath)
 		u.setError(fmt.Errorf("backup %s: %w", u.binaryPath, err))
 		return
 	}
-	u.appendLog("backup created")
+	if backupPath != "" {
+		u.appendLog(fmt.Sprintf("backup created: %s", backupPath))
+	} else {
+		u.appendLog("no existing binary to backup")
+	}
 
-	// Extract new binary
+	// Extract new binary (extracts to staging, then installs with sudo if needed)
 	u.setStatus(PhaseReplacing, fmt.Sprintf("extracting to %s", u.binaryPath))
 	if err := ExtractBinary(tarPath, u.binaryPath); err != nil {
 		os.Remove(tarPath)
@@ -315,24 +360,19 @@ func (u *Updater) applyAsync(version string) {
 	u.mu.Unlock()
 	u.saveStatusToFile(finalStatus)
 
-	// Remove backup BEFORE restart (code after restart won't execute)
-	if err := RemoveBackup(u.binaryPath); err != nil {
-		u.appendLog(fmt.Sprintf("warning: failed to remove backup: %s", err))
-	} else {
-		u.appendLog("backup removed")
-	}
-
-	// Restart service
+	// Restart service (uses sudo if needed)
 	u.setStatus(PhaseRestarting, fmt.Sprintf("running: systemctl restart %s", u.serviceName))
 	if err := RestartService(u.serviceName); err != nil {
 		u.appendLog(fmt.Sprintf("restart failed: %s, rolling back", err))
-		if rbErr := RestoreBackup(u.binaryPath); rbErr != nil {
-			u.setError(fmt.Errorf("restart failed (%w) AND rollback failed (%s)", err, rbErr))
-			return
+		if backupPath != "" {
+			if rbErr := RestoreBackup(backupPath, u.binaryPath); rbErr != nil {
+				u.setError(fmt.Errorf("restart failed (%w) AND rollback failed (%s)", err, rbErr))
+				return
+			}
+			u.appendLog("rollback complete, restarting with old binary")
+			RestartService(u.serviceName)
+			RemoveBackup(backupPath)
 		}
-		u.appendLog("rollback complete, restarting with old binary")
-		RestartService(u.serviceName)
-		RemoveBackup(u.binaryPath) // Clean up backup after rollback
 		u.setError(fmt.Errorf("restart failed, rolled back: %w", err))
 		return
 	}

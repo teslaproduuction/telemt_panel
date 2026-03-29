@@ -48,6 +48,7 @@ type Config struct {
 	Path     string       `toml:"-"` // config file path, set after loading
 	Listen   string       `toml:"listen"`
 	BasePath string       `toml:"base_path"`
+	DataDir  string       `toml:"data_dir"`
 	Telemt   TelemtConfig `toml:"telemt"`
 	Panel    PanelConfig  `toml:"panel"`
 	Auth     AuthConfig   `toml:"auth"`
@@ -151,6 +152,10 @@ func Load(path string) (*Config, error) {
 	// Validate auto-update intervals
 	_ = cfg.Telemt.AutoUpdate.Interval()
 	_ = cfg.Panel.AutoUpdate.Interval()
+
+	if cfg.DataDir == "" {
+		cfg.DataDir = "/var/lib/telemt-panel"
+	}
 
 	// Validate user defaults
 	if cfg.Users.Expiration != "" {
