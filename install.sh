@@ -5,14 +5,18 @@ set -eu
 REPO="amirotin/telemt_panel"
 BINARY_NAME="telemt-panel"
 SERVICE_NAME="telemt-panel"
-POLKIT_RULE="/etc/polkit-1/rules.d/10-telemt-restart.rules"
-
-# Non-root installation paths (hardened mode)
-SYSTEM_USER="telemt"
-BIN_DIR="/opt/bin/telemt"
-CONFIG_DIR="/opt/etc/telemt-panel"
+SYSTEM_USER="telemt-panel"
+BIN_DIR="/usr/local/bin"
+PANEL_BINARY_PATH="${BIN_DIR}/${BINARY_NAME}"
+CONFIG_DIR="/etc/telemt-panel"
+CONFIG_FILE="${CONFIG_DIR}/config.toml"
 DATA_DIR="/var/lib/telemt-panel"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+SUDOERS_FILE="/etc/sudoers.d/${SERVICE_NAME}"
+LEGACY_BIN_DIR="/opt/bin/telemt"
+LEGACY_CONFIG_DIR="/opt/etc/telemt-panel"
+
+# Conventional installation paths with a non-root service user
 
 # ── Utilities ────────────────────────────────────────────────────────────────
 say()  { printf '[INFO]  %s\n' "$*"; }
@@ -40,6 +44,40 @@ track_tmp() {
   _TMP_FILES="$_TMP_FILES $1"
 }
 
+command_path() {
+  _path=$(command -v "$1" 2>/dev/null || true)
+  [ -n "$_path" ] || die "Required command '$1' not found. Install it and re-run."
+  echo "$_path"
+}
+
+toml_value() {
+  _file="$1"
+  _section="$2"
+  _key="$3"
+  awk -v section="[$_section]" -v key="$_key" '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*\[/ {
+      in_section = ($0 == section)
+      next
+    }
+    in_section {
+      line = $0
+      sub(/[[:space:]]*#.*/, "", line)
+      split(line, parts, "=")
+      current_key = parts[1]
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", current_key)
+      if (current_key == key) {
+        value = substr(line, index(line, "=") + 1)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+        gsub(/^"/, "", value)
+        gsub(/"$/, "", value)
+        print value
+        exit
+      }
+    }
+  ' "$_file"
+}
+
 # ── Architecture ─────────────────────────────────────────────────────────────
 detect_arch() {
   _arch=$(uname -m)
@@ -54,6 +92,7 @@ detect_arch() {
 detect_telemt() {
   for _candidate in \
     "$BIN_DIR/telemt" \
+    "$LEGACY_BIN_DIR/telemt" \
     /bin/telemt \
     /usr/bin/telemt \
     /usr/local/bin/telemt; do
@@ -86,7 +125,7 @@ create_system_user() {
 
 # ── Check required commands ──────────────────────────────────────────────────
 check_deps() {
-  for _cmd in curl tar openssl; do
+  for _cmd in curl tar openssl systemctl; do
     command -v "$_cmd" >/dev/null 2>&1 || die "Required command '$_cmd' not found. Install it and re-run."
   done
   # sha256sum is optional (used for checksum verification)
@@ -100,43 +139,73 @@ setup_directories() {
   say "Setting up directories..."
   $SUDO mkdir -p "$BIN_DIR"
   $SUDO mkdir -p "$CONFIG_DIR"
-  $SUDO mkdir -p "$DATA_DIR"
-  $SUDO chown "$SYSTEM_USER:$SYSTEM_USER" "$BIN_DIR"
+  $SUDO mkdir -p "$DATA_DIR/staging"
   $SUDO chown "$SYSTEM_USER:$SYSTEM_USER" "$CONFIG_DIR"
   $SUDO chown "$SYSTEM_USER:$SYSTEM_USER" "$DATA_DIR"
+  $SUDO chown "$SYSTEM_USER:$SYSTEM_USER" "$DATA_DIR/staging"
 }
 
-# ── Polkit rule for service restart (optional) ──────────────────────────────
-install_polkit_rule() {
-  if [ -f "$POLKIT_RULE" ]; then
-    say "Polkit rule already exists - skipping"
-    return
+warn_legacy_install() {
+  if [ -e "$LEGACY_BIN_DIR/$BINARY_NAME" ] || [ -d "$LEGACY_CONFIG_DIR" ]; then
+    say "WARNING: Legacy /opt installation detected."
+    say "This installer now uses $PANEL_BINARY_PATH and $CONFIG_FILE."
+    say "Review and remove old /opt paths manually after confirming the new installation works."
   fi
-  # Skip if polkit is not installed
-  if ! command -v pkaction >/dev/null 2>&1 && [ ! -d "/etc/polkit-1/rules.d" ]; then
-    say "Polkit not found - skipping rule installation"
-    say "Note: without polkit, the panel cannot restart services as non-root user"
-    say "You can install polkit later and re-run the installer, or use sudo"
-    return
-  fi
-  $SUDO mkdir -p "$(dirname "$POLKIT_RULE")"
-  say "Installing polkit rule for service restart..."
-  cat <<'POLKIT_EOF' | write_root "$POLKIT_RULE"
-polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.systemd1.manage-units" &&
-        (action.lookup("unit") == "telemt.service" || action.lookup("unit") == "telemt-panel.service") &&
-        subject.user == "telemt") {
-        var verb = action.lookup("verb");
-        if (verb == "restart" || verb == "start") {
-            return polkit.Result.YES;
-        }
-    }
-});
-POLKIT_EOF
-  say "Polkit rule installed to $POLKIT_RULE"
 }
 
-# ── Systemd unit (hardened, non-root) ───────────────────────────────────────
+install_sudoers_dropin() {
+  _telemt_path="$1"
+  _telemt_service="$2"
+
+  [ -n "$_telemt_path" ] || _telemt_path=$(detect_telemt)
+  [ -n "$_telemt_service" ] || _telemt_service="telemt"
+
+  _cp=$(command_path cp)
+  _mv=$(command_path mv)
+  _chmod=$(command_path chmod)
+  _rm=$(command_path rm)
+  _systemctl=$(command_path systemctl)
+  _visudo=$(command -v visudo 2>/dev/null || true)
+
+  _panel_tmp="${BIN_DIR}/.${BINARY_NAME}.tmp"
+  _panel_backup="${DATA_DIR}/staging/${BINARY_NAME}.bak"
+  _telemt_name=$(basename "$_telemt_path")
+  _telemt_dir=$(dirname "$_telemt_path")
+  _telemt_tmp="${_telemt_dir}/.${_telemt_name}.tmp"
+  _telemt_backup="${DATA_DIR}/staging/${_telemt_name}.bak"
+
+  say "Installing sudoers drop-in for updater operations..."
+  _tmp=$(mktemp)
+  track_tmp "$_tmp"
+  cat >"$_tmp" <<EOF
+$SYSTEM_USER ALL=(root) NOPASSWD: $_cp -f $PANEL_BINARY_PATH $_panel_backup
+$SYSTEM_USER ALL=(root) NOPASSWD: $_cp -f $_telemt_path $_telemt_backup
+$SYSTEM_USER ALL=(root) NOPASSWD: $_cp -f ${DATA_DIR}/staging/* $_panel_tmp
+$SYSTEM_USER ALL=(root) NOPASSWD: $_cp -f ${DATA_DIR}/staging/* $_telemt_tmp
+$SYSTEM_USER ALL=(root) NOPASSWD: $_chmod 0755 $_panel_tmp
+$SYSTEM_USER ALL=(root) NOPASSWD: $_chmod 0755 $_telemt_tmp
+$SYSTEM_USER ALL=(root) NOPASSWD: $_mv -f $_panel_tmp $PANEL_BINARY_PATH
+$SYSTEM_USER ALL=(root) NOPASSWD: $_mv -f $_telemt_tmp $_telemt_path
+$SYSTEM_USER ALL=(root) NOPASSWD: $_rm -f $_panel_tmp
+$SYSTEM_USER ALL=(root) NOPASSWD: $_rm -f $_telemt_tmp
+$SYSTEM_USER ALL=(root) NOPASSWD: $_rm -f ${PANEL_BINARY_PATH}.bak
+$SYSTEM_USER ALL=(root) NOPASSWD: $_rm -f ${_telemt_path}.bak
+$SYSTEM_USER ALL=(root) NOPASSWD: $_systemctl restart $SERVICE_NAME
+$SYSTEM_USER ALL=(root) NOPASSWD: $_systemctl restart $_telemt_service
+$SYSTEM_USER ALL=(root) NOPASSWD: $_systemctl start $SERVICE_NAME
+$SYSTEM_USER ALL=(root) NOPASSWD: $_systemctl start $_telemt_service
+EOF
+
+  if [ -n "$_visudo" ]; then
+    $SUDO "$_visudo" -cf "$_tmp" >/dev/null || die "Generated sudoers file is invalid"
+  fi
+
+  $SUDO mkdir -p "$(dirname "$SUDOERS_FILE")"
+  $SUDO install -m 0440 "$_tmp" "$SUDOERS_FILE"
+  say "Sudoers drop-in installed to $SUDOERS_FILE"
+}
+
+# ── Systemd unit (non-root service with sudoers-backed updates) ─────────────
 generate_service() {
   cat <<EOF
 [Unit]
@@ -146,16 +215,15 @@ After=network.target
 [Service]
 Type=simple
 User=$SYSTEM_USER
-ExecStart=$BIN_DIR/$BINARY_NAME --config $CONFIG_DIR/config.toml
+ExecStart=$PANEL_BINARY_PATH --config $CONFIG_FILE
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
 
-# Sandboxing
-NoNewPrivileges=true
+# Hardening compatible with sudo-based updater operations
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=$BIN_DIR $CONFIG_DIR $DATA_DIR
+ReadWritePaths=$CONFIG_DIR $DATA_DIR
 
 [Install]
 WantedBy=multi-user.target
@@ -188,16 +256,16 @@ prompt_secret() {
 # ── Usage ────────────────────────────────────────────────────────────────────
 usage() {
   cat <<EOF
-Telemt Panel Installer (hardened, non-root mode)
+Telemt Panel Installer (standard layout, non-root service)
 
-Creates a dedicated system user '$SYSTEM_USER' and uses sandboxed
-directories instead of running as root.
+Creates a dedicated system user '$SYSTEM_USER', installs into standard
+Linux paths, and configures a narrow sudoers drop-in for updater actions.
 
 Usage: $0 <command> [options]
 
 Commands:
   install [version]   Install or update (default: latest release)
-  uninstall           Remove binary, service, and polkit rule
+  uninstall           Remove binary, service, and sudoers drop-in
   purge               Remove everything including config, data, and user
   --help              Show this help
 
@@ -208,11 +276,11 @@ Examples:
   $0 purge            Remove everything
 
 Directories:
-  Binary:   $BIN_DIR/$BINARY_NAME
-  Config:   $CONFIG_DIR/config.toml
+  Binary:   $PANEL_BINARY_PATH
+  Config:   $CONFIG_FILE
   Data:     $DATA_DIR/
   Service:  $SERVICE_FILE
-  Polkit:   $POLKIT_RULE
+  Sudoers:  $SUDOERS_FILE
 EOF
 }
 
@@ -222,15 +290,15 @@ EOF
 do_install() {
   _version="${1:-}"
 
-  printf '\n  Telemt Panel Installer (hardened mode)\n\n'
+  printf '\n  Telemt Panel Installer (standard layout)\n\n'
 
   # ── Stage 0: Check dependencies ────────────────────────────────────────
   check_deps
 
   # ── Stage 1: Create system user and directories ─────────────────────────
+  warn_legacy_install
   create_system_user
   setup_directories
-  install_polkit_rule
 
   # ── Stage 2: Detect architecture ─────────────────────────────────────────
   say "Detecting architecture..."
@@ -286,13 +354,18 @@ do_install() {
   EXTRACTED="/tmp/telemt-panel-${ARCH}-linux"
   track_tmp "$EXTRACTED"
 
-  install_binary "$EXTRACTED" "$BIN_DIR/$BINARY_NAME"
-  $SUDO chown "$SYSTEM_USER:$SYSTEM_USER" "$BIN_DIR/$BINARY_NAME"
-  say "Installed $BIN_DIR/$BINARY_NAME ($TAG)"
+  install_binary "$EXTRACTED" "$PANEL_BINARY_PATH"
+  say "Installed $PANEL_BINARY_PATH ($TAG)"
 
   # ── Stage 4: Configure ──────────────────────────────────────────────────
-  if [ -f "$CONFIG_DIR/config.toml" ]; then
-    say "Config already exists at $CONFIG_DIR/config.toml - skipping"
+  if [ -f "$CONFIG_FILE" ]; then
+    say "Config already exists at $CONFIG_FILE - skipping"
+    TELEMT_PATH=$(toml_value "$CONFIG_FILE" telemt binary_path || true)
+    TELEMT_SERVICE=$(toml_value "$CONFIG_FILE" telemt service_name || true)
+    [ -n "${TELEMT_PATH:-}" ] || TELEMT_PATH=$(detect_telemt)
+    [ -n "${TELEMT_SERVICE:-}" ] || TELEMT_SERVICE="telemt"
+    $SUDO chown "$SYSTEM_USER:$SYSTEM_USER" "$CONFIG_FILE"
+    $SUDO chmod 600 "$CONFIG_FILE"
   else
     say "Setting up initial configuration..."
     echo ""
@@ -311,13 +384,14 @@ do_install() {
 
     say "Generating password hash..."
     # Use printf to pipe password to avoid heredoc indentation issues
-    PASS_HASH=$(printf '%s\n' "$ADMIN_PASS" | "$BIN_DIR/$BINARY_NAME" hash-password) \
+    PASS_HASH=$(printf '%s\n' "$ADMIN_PASS" | "$PANEL_BINARY_PATH" hash-password) \
       || die "Failed to generate password hash"
 
     JWT_SECRET=$(openssl rand -hex 32)
 
-    # Build config with hardened paths
+    # Build config with standard paths
     _cfg="listen = \"0.0.0.0:8080\"
+data_dir = \"$DATA_DIR\"
 
 [telemt]
 url = \"$TELEMT_URL\""
@@ -332,7 +406,7 @@ binary_path = \"$TELEMT_PATH\"
 service_name = \"$TELEMT_SERVICE\"
 
 [panel]
-binary_path = \"$BIN_DIR/$BINARY_NAME\"
+binary_path = \"$PANEL_BINARY_PATH\"
 service_name = \"$SERVICE_NAME\"
 
 [auth]
@@ -341,11 +415,13 @@ password_hash = \"$PASS_HASH\"
 jwt_secret = \"$JWT_SECRET\"
 session_ttl = \"24h\""
 
-    printf '%s\n' "$_cfg" | write_root "$CONFIG_DIR/config.toml"
-    $SUDO chown "$SYSTEM_USER:$SYSTEM_USER" "$CONFIG_DIR/config.toml"
-    $SUDO chmod 600 "$CONFIG_DIR/config.toml"
-    say "Config saved to $CONFIG_DIR/config.toml"
+    printf '%s\n' "$_cfg" | write_root "$CONFIG_FILE"
+    $SUDO chown "$SYSTEM_USER:$SYSTEM_USER" "$CONFIG_FILE"
+    $SUDO chmod 600 "$CONFIG_FILE"
+    say "Config saved to $CONFIG_FILE"
   fi
+
+  install_sudoers_dropin "$TELEMT_PATH" "$TELEMT_SERVICE"
 
   # ── Stage 5: Install service ─────────────────────────────────────────────
   say "Installing systemd service..."
@@ -362,8 +438,10 @@ session_ttl = \"24h\""
   printf '\n'
   printf '  Panel URL:     http://%s:8080\n' "$_ip"
   printf '  System user:   %s\n' "$SYSTEM_USER"
-  printf '  Binary:        %s\n' "$BIN_DIR/$BINARY_NAME"
-  printf '  Config:        %s/config.toml\n' "$CONFIG_DIR"
+  printf '  Binary:        %s\n' "$PANEL_BINARY_PATH"
+  printf '  Config:        %s\n' "$CONFIG_FILE"
+  printf '  Data:          %s\n' "$DATA_DIR"
+  printf '  Sudoers:       %s\n' "$SUDOERS_FILE"
   printf '  Service:       %s\n' "$SERVICE_NAME"
   printf '\n'
   printf '  Useful commands:\n'
@@ -391,15 +469,15 @@ do_uninstall() {
   fi
 
   if [ -f "$BIN_DIR/$BINARY_NAME" ]; then
-    $SUDO rm -f "$BIN_DIR/$BINARY_NAME"
+    $SUDO rm -f "$PANEL_BINARY_PATH"
     say "Binary removed"
   else
     say "Binary not found - skipping"
   fi
 
-  if [ -f "$POLKIT_RULE" ]; then
-    $SUDO rm -f "$POLKIT_RULE"
-    say "Polkit rule removed"
+  if [ -f "$SUDOERS_FILE" ]; then
+    $SUDO rm -f "$SUDOERS_FILE"
+    say "Sudoers drop-in removed"
   fi
 
   printf '\n'
@@ -418,12 +496,6 @@ do_purge() {
   say "Removing config and data..."
   $SUDO rm -rf "$CONFIG_DIR"
   $SUDO rm -rf "$DATA_DIR"
-
-  # Remove bin directory if empty
-  if [ -d "$BIN_DIR" ] && [ -z "$(ls -A "$BIN_DIR" 2>/dev/null)" ]; then
-    $SUDO rmdir "$BIN_DIR"
-    say "Removed empty $BIN_DIR"
-  fi
 
   # Remove system user if no other processes depend on it
   if id "$SYSTEM_USER" >/dev/null 2>&1; then

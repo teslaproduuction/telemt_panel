@@ -163,9 +163,10 @@ go build -ldflags="-s -w -X main.version=1.2.3" -o telemt-panel .
 
 ### Установка скриптом (рекомендуется)
 
-Скрипт автоматически создаёт системного пользователя `telemt`, выделяет изолированные
-директории для бинарников и конфигов, устанавливает polkit-правило для перезапуска
-сервисов и генерирует песочницу systemd-юнит:
+Скрипт автоматически создаёт системного пользователя `telemt-panel`, устанавливает
+бинарник панели в `/usr/local/bin`, конфиг в `/etc/telemt-panel`, данные в
+`/var/lib/telemt-panel`, настраивает узкий `sudoers`-drop-in для обновлений и
+генерирует hardened systemd-юнит:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/amirotin/telemt_panel/main/install.sh | bash
@@ -173,38 +174,42 @@ curl -fsSL https://raw.githubusercontent.com/amirotin/telemt_panel/main/install.
 
 | Компонент | Путь |
 |-----------|------|
-| Бинарник панели | `/opt/bin/telemt/telemt-panel` |
-| Конфиг панели | `/opt/etc/telemt-panel/config.toml` |
+| Бинарник панели | `/usr/local/bin/telemt-panel` |
+| Конфиг панели | `/etc/telemt-panel/config.toml` |
 | Данные (кэш сертификатов и т.д.) | `/var/lib/telemt-panel/` |
 | Systemd-юнит | `/etc/systemd/system/telemt-panel.service` |
-| Polkit-правило | `/etc/polkit-1/rules.d/10-telemt-restart.rules` |
+| Sudoers drop-in | `/etc/sudoers.d/telemt-panel` |
 
 Сгенерированный юнит включает:
 
 ```ini
 [Service]
-User=telemt
-NoNewPrivileges=true
+User=telemt-panel
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/opt/bin/telemt /opt/etc/telemt-panel /var/lib/telemt-panel
+ReadWritePaths=/etc/telemt-panel /var/lib/telemt-panel
 ```
 
-Polkit-правило позволяет пользователю `telemt` перезапускать `telemt.service` и
-`telemt-panel.service` без интерактивного запроса пароля.
+`NoNewPrivileges` не включается, потому что сервис использует `sudo` для строго
+ограниченных операций обновления.
 
-### Ручная установка от root
+`sudoers`-drop-in позволяет пользователю `telemt-panel` выполнять только нужные
+обновлению команды: замену бинарника, очистку staging-файлов и перезапуск
+`telemt.service` и `telemt-panel.service`.
+
+### Ручная установка
 
 ```bash
+sudo useradd --system --shell /usr/sbin/nologin --home /nonexistent telemt-panel
 sudo cp telemt-panel.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now telemt-panel
 ```
 
-> **Важно:** при ручной установке сервис работает от root. Это необходимо для:
-> - обновления бинарников в `/usr/local/bin` и `/bin`
-> - редактирования конфига Telemt в `/etc/telemt/`
-> - перезапуска systemd-сервисов (`telemt`, `telemt-panel`)
+> **Важно:** этот unit-файл запускает панель от пользователя `telemt-panel`.
+> Если вы устанавливаете вручную, создайте пользователя и настройте права,
+> эквивалентные installer-managed `sudoers`-drop-in, или отредактируйте unit
+> под свою модель запуска.
 
 ### Удаление
 
@@ -212,7 +217,7 @@ sudo systemctl enable --now telemt-panel
 # Только сервис и бинарник (конфиг и данные сохраняются)
 ./install.sh uninstall
 
-# Полное удаление (включая пользователя telemt)
+# Полное удаление (включая пользователя telemt-panel)
 ./install.sh purge
 ```
 

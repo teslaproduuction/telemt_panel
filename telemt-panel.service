@@ -4,14 +4,16 @@ After=network.target
 
 [Service]
 Type=simple
+User=telemt-panel
 ExecStart=/usr/local/bin/telemt-panel --config /etc/telemt-panel/config.toml
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
 
-# Hardening (compatible with update and config editing features)
-NoNewPrivileges=true
+# Hardening compatible with sudo-based updater operations
 ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/etc/telemt-panel /var/lib/telemt-panel
 
 [Install]
 WantedBy=multi-user.target

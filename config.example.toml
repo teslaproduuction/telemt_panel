@@ -18,7 +18,7 @@ url = "http://127.0.0.1:9091"
 # Authorization header value sent to Telemt API
 auth_header = "your-telemt-api-secret"
 # Path to telemt binary (default: /bin/telemt)
-# For non-root installation: binary_path = "/opt/bin/telemt/telemt"
+# For standard system installs: binary_path = "/bin/telemt"
 # binary_path = "/bin/telemt"
 # Systemd service name (default: telemt)
 # service_name = "telemt"
@@ -37,7 +37,6 @@ auth_header = "your-telemt-api-secret"
 
 [panel]
 # Path to telemt-panel binary (default: /usr/local/bin/telemt-panel)
-# For non-root installation: binary_path = "/opt/bin/telemt/telemt-panel"
 # binary_path = "/usr/local/bin/telemt-panel"
 # Systemd service name (default: telemt-panel)
 # service_name = "telemt-panel"
