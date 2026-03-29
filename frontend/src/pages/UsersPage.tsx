@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Header } from '@/components/layout/Header';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -9,7 +9,7 @@ import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from '@/components/ui/table';
 import { usePolling } from '@/hooks/usePolling';
-import { telemt, ApiError } from '@/lib/api';
+import { telemt, panelApi, ApiError } from '@/lib/api';
 import { Link } from 'react-router-dom';
 import { Copy, Plus, Pencil, Trash2, Check, ArrowUp, ArrowDown, ArrowUpDown, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatBytes } from '@/lib/utils';
@@ -187,6 +187,19 @@ export function UsersPage() {
   const [deleteUser, setDeleteUser] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [userDefaults, setUserDefaults] = useState<{
+    user_ad_tag?: string;
+    max_tcp_conns?: number;
+    data_quota_bytes?: number;
+    max_unique_ips?: number;
+    expiration_rfc3339?: string;
+  }>({});
+
+  useEffect(() => {
+    panelApi.get<typeof userDefaults>('/users/defaults')
+      .then(setUserDefaults)
+      .catch((e) => console.warn('Failed to load user defaults:', e));
+  }, []);
 
   const handleCreate = useCallback(async (data: Record<string, unknown>) => {
     await telemt.post('/v1/users', data);
@@ -492,6 +505,7 @@ export function UsersPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onSubmit={handleCreate}
+        initialData={userDefaults}
         mode="create"
       />
 

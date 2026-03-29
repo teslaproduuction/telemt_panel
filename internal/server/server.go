@@ -220,6 +220,11 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		})
 	})))
 
+	// User defaults endpoint
+	mux.Handle("GET /api/users/defaults", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, jsonResponse{OK: true, Data: s.cfg.Users})
+	})))
+
 	// WebSocket endpoint (auth checked via cookie on upgrade)
 	wsHandler := ws.NewHandler(s.cfg.Telemt.URL, s.cfg.Telemt.AuthHeader)
 	mux.Handle("/api/ws", auth.RequireAuth(jwtSecret, wsHandler))

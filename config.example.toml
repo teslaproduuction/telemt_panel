@@ -81,3 +81,14 @@ password_hash = "$2a$10$CHANGE_ME"
 jwt_secret = "change-me-to-a-random-string-at-least-32-chars"
 # Session duration
 session_ttl = "24h"
+
+[users]
+# Default values for new user creation form.
+# These are pre-filled when clicking "Create User".
+# A value of 0 means "not set" — the form field will be empty.
+# (Do NOT set 0 for max_tcp_conns etc. in telemt, where 0 = "block user".)
+# ad_tag = ""
+# max_tcp_conns = 5
+# data_quota_bytes = 1073741824
+# max_unique_ips = 3
+# expiration = "2027-12-31T23:59:59Z"
