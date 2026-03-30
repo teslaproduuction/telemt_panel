@@ -1,6 +1,26 @@
 # Telemt Panel
 
+[![CI](https://github.com/amirotin/telemt_panel/actions/workflows/ci.yml/badge.svg)](https://github.com/amirotin/telemt_panel/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/amirotin/telemt_panel?include_prereleases)](https://github.com/amirotin/telemt_panel/releases)
+[![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go)](https://go.dev/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/amirotin/telemt_panel?style=social)](https://github.com/amirotin/telemt_panel/stargazers)
+
 Web-панель управления для [Telemt](https://github.com/telemt/telemt) MTProxy. Позволяет мониторить состояние сервера, управлять пользователями, отслеживать безопасность и обновлять бинарник — всё через браузер.
+
+## Содержание
+
+- [Скриншоты](#скриншоты)
+- [Возможности](#возможности)
+- [Требования](#требования)
+- [Быстрый старт](#быстрый-старт)
+- [Сборка](#сборка)
+- [Конфигурация](#конфигурация)
+- [Systemd](#systemd)
+- [CLI](#cli)
+- [Стек](#стек)
+- [Лицензия](#лицензия)
 
 ## Скриншоты
 
@@ -243,4 +263,4 @@ telemt-panel version                 # показать версию
 
 ## Лицензия
 
-MIT
+[MIT](LICENSE)

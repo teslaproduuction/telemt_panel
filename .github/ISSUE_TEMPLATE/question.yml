@@ -1,0 +1,33 @@
+name: Question / Support
+description: Ask about installation, configuration, or usage
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question? Check the [Wiki](../../wiki) first, then ask here.
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      options:
+        - Installation
+        - Configuration
+        - Telemt API / Proxy
+        - TLS / ACME
+        - Updates
+        - GeoIP
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Panel version, OS, Telemt version, relevant config (sanitized)

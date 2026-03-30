@@ -1,0 +1,68 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please fill out the sections below.
+  - type: input
+    id: version
+    attributes:
+      label: Panel Version
+      description: Output of `telemt-panel version` or release tag
+      placeholder: e.g. 0.3.0
+    validations:
+      required: true
+  - type: input
+    id: telemt-version
+    attributes:
+      label: Telemt Version
+      description: Version of the Telemt server you are managing
+      placeholder: e.g. 1.2.3
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Installation Method
+      options:
+        - Install script (curl | bash)
+        - Manual binary
+        - Docker
+        - Built from source
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: What did you do?
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Panel logs (`journalctl -u telemt-panel`), browser console, etc.
+      render: shell
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration (sanitized)
+      description: Relevant parts of config.toml (REMOVE secrets!)
+      render: toml
