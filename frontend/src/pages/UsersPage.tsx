@@ -253,6 +253,33 @@ export function UsersPage() {
           </Button>
         </div>
 
+        {/* Mobile Sort Bar */}
+        <div className="lg:hidden flex items-center justify-between gap-2 bg-surface p-2 sm:p-3 rounded-lg border border-border">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-sm font-medium text-text-secondary whitespace-nowrap">Sort by:</span>
+            <select
+              value={sortKey}
+              onChange={(e) => toggleSort(e.target.value as SortKey)}
+              aria-label="Sort by"
+              className="flex-1 min-w-0 bg-background text-text-primary rounded-md px-2 py-1.5 text-sm border border-border focus:border-accent focus:outline-none"
+            >
+              <option value="username">Username</option>
+              <option value="current_connections">Connections</option>
+              <option value="active_unique_ips">Active IPs</option>
+              <option value="total_octets">Traffic</option>
+              <option value="expiration_rfc3339">Expiration</option>
+            </select>
+          </div>
+          <button
+            onClick={() => toggleSort(sortKey)}
+            aria-label={sortDir === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
+            title={sortDir === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
+            className="p-1.5 rounded-md border border-border bg-background hover:bg-surface-hover text-text-secondary transition-colors flex-shrink-0"
+          >
+            {sortDir === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
+          </button>
+        </div>
+
         {/* Desktop Table */}
         <div className="hidden lg:block border border-border rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
