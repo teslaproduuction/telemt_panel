@@ -7,6 +7,46 @@ on:
     branches: [ main ]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend (needed for embed)
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Go format check
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "Files not formatted with gofmt:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: Go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -29,10 +69,13 @@ jobs:
           npm ci
           npm run build
 
-      - name: Build backend
+      - name: TypeScript check
         run: |
-          go build -v .
+          cd frontend
+          npx tsc --noEmit
+
+      - name: Build backend
+        run: go build -v .
 
       - name: Run tests
-        run: |
-          go test -v ./...
+        run: go test -v ./...

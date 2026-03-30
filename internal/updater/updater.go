@@ -46,14 +46,14 @@ type CheckResult struct {
 }
 
 type Updater struct {
-	mu             sync.Mutex
-	status         Status
-	telemtURL      string
-	binaryPath     string
-	serviceName    string
-	githubRepo     string
-	authHeader     string
-	releaseLimits  github.ReleaseLimits
+	mu            sync.Mutex
+	status        Status
+	telemtURL     string
+	binaryPath    string
+	serviceName   string
+	githubRepo    string
+	authHeader    string
+	releaseLimits github.ReleaseLimits
 }
 
 func New(telemtURL, binaryPath, serviceName, githubRepo, authHeader, dataDir string, maxNewer, maxOlder int) *Updater {
@@ -75,12 +75,12 @@ func New(telemtURL, binaryPath, serviceName, githubRepo, authHeader, dataDir str
 	SetBinaryPathForDetection(binaryPath)
 
 	return &Updater{
-		status:      Status{Phase: PhaseIdle},
-		telemtURL:   telemtURL,
-		binaryPath:  binaryPath,
-		serviceName: serviceName,
-		githubRepo:  githubRepo,
-		authHeader:  authHeader,
+		status:        Status{Phase: PhaseIdle},
+		telemtURL:     telemtURL,
+		binaryPath:    binaryPath,
+		serviceName:   serviceName,
+		githubRepo:    githubRepo,
+		authHeader:    authHeader,
 		releaseLimits: github.ReleaseLimits{MaxNewer: maxNewer, MaxOlder: maxOlder},
 	}
 }

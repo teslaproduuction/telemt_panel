@@ -90,4 +90,3 @@ func CheckStatus(serviceName, containerName string) SourceStatus {
 	}
 	return SourceStatus{Available: true, Source: "journalctl", Target: serviceName}
 }
-

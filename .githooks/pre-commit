@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook: auto-formats Go code and runs checks.
+# Install: git config core.hooksPath .githooks
+#
+
+set -e
+
+echo "Running pre-commit checks..."
+
+# Go auto-format
+echo "  [go] gofmt (auto-format)..."
+FILES=$(gofmt -l .)
+if [ -n "$FILES" ]; then
+  echo "  Formatting:"
+  echo "$FILES" | while read -r f; do echo "    $f"; done
+  gofmt -w .
+  echo "$FILES" | xargs git add
+fi
+
+# Go vet
+echo "  [go] go vet..."
+go vet ./... 2>/dev/null
+
+# Frontend TypeScript check (only if frontend/ has changes)
+if git diff --cached --name-only | grep -q "^frontend/"; then
+  echo "  [frontend] tsc --noEmit..."
+  (cd frontend && npx tsc --noEmit)
+fi
+
+echo "All checks passed."

@@ -17,7 +17,6 @@ import (
 	"github.com/telemt/telemt-panel/internal/sysutil"
 )
 
-var httpClient = &http.Client{Timeout: 30 * time.Second}
 var downloadClient = &http.Client{Timeout: 5 * time.Minute}
 
 // stagingDir is set by the updater to control where downloads and backups go.

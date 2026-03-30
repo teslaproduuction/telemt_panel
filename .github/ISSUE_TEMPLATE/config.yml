@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/amirotin/telemt_panel/wiki
+    about: Check the Wiki for installation, configuration, and troubleshooting guides.
+  - name: README
+    url: https://github.com/amirotin/telemt_panel#readme
+    about: Full setup instructions and feature overview (Russian).

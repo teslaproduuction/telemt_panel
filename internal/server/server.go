@@ -108,7 +108,9 @@ type loginRequest struct {
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {
@@ -264,7 +266,7 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 			Version string `json:"version"`
 		}
 		// Body is optional — ignore decode errors for backward compat
-		json.NewDecoder(r.Body).Decode(&req)
+		_ = json.NewDecoder(r.Body).Decode(&req)
 
 		if err := upd.Apply(req.Version); err != nil {
 			writeError(w, http.StatusConflict, "UPDATE_IN_PROGRESS", err.Error())
@@ -310,7 +312,7 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		var req struct {
 			Version string `json:"version"`
 		}
-		json.NewDecoder(r.Body).Decode(&req)
+		_ = json.NewDecoder(r.Body).Decode(&req)
 
 		if err := panelUpd.Apply(req.Version); err != nil {
 			writeError(w, http.StatusConflict, "UPDATE_IN_PROGRESS", err.Error())
@@ -387,12 +389,12 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		// Persist auto-update settings to config file
 		if s.cfg.Path != "" {
 			updates := map[string]interface{}{
-				"panel.auto_update.enabled":        req.Panel.Enabled,
+				"panel.auto_update.enabled":         req.Panel.Enabled,
 				"panel.auto_update.check_interval":  req.Panel.CheckInterval,
 				"panel.auto_update.auto_apply":      req.Panel.AutoApply,
 				"telemt.auto_update.enabled":        req.Telemt.Enabled,
-				"telemt.auto_update.check_interval":  req.Telemt.CheckInterval,
-				"telemt.auto_update.auto_apply":      req.Telemt.AutoApply,
+				"telemt.auto_update.check_interval": req.Telemt.CheckInterval,
+				"telemt.auto_update.auto_apply":     req.Telemt.AutoApply,
 			}
 			if _, err := telemt_config.QuickUpdate(s.cfg.Path, updates); err != nil {
 				log.Printf("WARNING: failed to persist auto-update config: %s", err)
@@ -538,7 +540,7 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 			log.Printf("WARNING: failed to open GeoIP database: %s (check that db_path and asn_db_path point to valid .mmdb files)", geoErr)
 		} else {
 			log.Printf("GeoIP: databases loaded successfully")
-			defer geoipLookup.Close()
+			defer func() { _ = geoipLookup.Close() }()
 		}
 	}
 
