@@ -259,10 +259,8 @@ export function UsersPage() {
             <span className="text-sm font-medium text-text-secondary whitespace-nowrap">Sort by:</span>
             <select
               value={sortKey}
-              onChange={(e) => {
-                const newKey = e.target.value as SortKey;
-                if (newKey !== sortKey) toggleSort(newKey);
-              }}
+              onChange={(e) => toggleSort(e.target.value as SortKey)}
+              aria-label="Sort by"
               className="flex-1 min-w-0 bg-background text-text-primary rounded-md px-2 py-1.5 text-sm border border-border focus:border-accent focus:outline-none"
             >
               <option value="username">Username</option>
@@ -274,8 +272,9 @@ export function UsersPage() {
           </div>
           <button
             onClick={() => toggleSort(sortKey)}
-            className="p-1.5 rounded-md border border-border bg-background hover:bg-surface-hover text-text-secondary transition-colors flex-shrink-0"
+            aria-label={sortDir === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
             title={sortDir === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
+            className="p-1.5 rounded-md border border-border bg-background hover:bg-surface-hover text-text-secondary transition-colors flex-shrink-0"
           >
             {sortDir === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
           </button>
