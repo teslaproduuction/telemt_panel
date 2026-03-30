@@ -182,14 +182,13 @@ func RestartService(serviceName string) error {
 
 	// Try without sudo first (works if panel has polkit rule or runs as root)
 	cmd := exec.Command("systemctl", "restart", serviceName)
-	output, err := cmd.CombinedOutput()
-	if err == nil {
+	if _, err := cmd.CombinedOutput(); err == nil {
 		return nil
 	}
 
 	// Fall back to sudo
 	cmd = exec.Command("sudo", "systemctl", "restart", serviceName)
-	output, err = cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("systemctl restart %s failed: %s: %w", serviceName, string(output), err)
 	}

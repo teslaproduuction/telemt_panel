@@ -90,8 +90,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
 		msg.Timestamp = time.Now().UnixMilli()
-		conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-		conn.WriteJSON(msg)
+		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		if err := conn.WriteJSON(msg); err != nil {
+			log.Printf("ws write error: %v", err)
+		}
 	}
 
 	// Poll a single Telemt endpoint and push results
@@ -215,6 +217,6 @@ func (h *Handler) fetchAndSend(endpoint string, send func(ServerMessage)) {
 
 	// Send raw data to avoid double-encoding
 	var data interface{}
-	json.Unmarshal(envelope.Data, &data)
+	_ = json.Unmarshal(envelope.Data, &data)
 	send(ServerMessage{Type: "data", Endpoint: endpoint, Data: data})
 }
