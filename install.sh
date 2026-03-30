@@ -31,17 +31,18 @@ write_root() {
   $SUDO tee "$1" >/dev/null
 }
 
-_TMP_FILES=""
+TEMP_DIR=""
 cleanup() {
-  if [ -n "$_TMP_FILES" ]; then
-    # shellcheck disable=SC2086
-    rm -f $_TMP_FILES
+  if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
+    rm -rf -- "$TEMP_DIR"
   fi
 }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 
-track_tmp() {
-  _TMP_FILES="$_TMP_FILES $1"
+ensure_temp_dir() {
+  if [ -z "$TEMP_DIR" ]; then
+    TEMP_DIR=$(mktemp -d)
+  fi
 }
 
 command_path() {
@@ -56,7 +57,7 @@ toml_value() {
   _key="$3"
   awk -v section="[$_section]" -v key="$_key" '
     /^[[:space:]]*#/ { next }
-    /^[[:space:]]*\[/ {
+    /^[[:space:]]*\[[^[]/ {
       in_section = ($0 == section)
       next
     }
@@ -123,6 +124,37 @@ create_system_user() {
   fi
 }
 
+# ── Join telemt group for config access ─────────────────────────────────────
+join_telemt_group() {
+  _telemt_group=""
+  # Detect telemt group from its config directory
+  if [ -d "/etc/telemt" ]; then
+    _telemt_group=$(stat -c '%G' /etc/telemt 2>/dev/null || true)
+  fi
+  # Fallback: check if 'telemt' group exists directly
+  if [ -z "$_telemt_group" ] || [ "$_telemt_group" = "root" ]; then
+    if command -v getent >/dev/null 2>&1; then
+      getent group telemt >/dev/null 2>&1 && _telemt_group="telemt"
+    elif grep -q "^telemt:" /etc/group 2>/dev/null; then
+      _telemt_group="telemt"
+    fi
+  fi
+
+  if [ -n "$_telemt_group" ] && [ "$_telemt_group" != "root" ]; then
+    if id -nG "$SYSTEM_USER" 2>/dev/null | grep -qw "$_telemt_group"; then
+      say "User '$SYSTEM_USER' already in group '$_telemt_group'"
+    else
+      $SUDO usermod -aG "$_telemt_group" "$SYSTEM_USER" 2>/dev/null \
+        || $SUDO adduser "$SYSTEM_USER" "$_telemt_group" 2>/dev/null \
+        || { say "WARNING: Could not add '$SYSTEM_USER' to group '$_telemt_group' — add manually for telemt config access"; return; }
+      say "Added '$SYSTEM_USER' to group '$_telemt_group' for telemt config access"
+    fi
+  else
+    say "WARNING: telemt group not found — panel won't have access to telemt config"
+    say "After installing telemt, re-run this installer or: sudo usermod -aG telemt $SYSTEM_USER"
+  fi
+}
+
 # ── Check required commands ──────────────────────────────────────────────────
 check_deps() {
   for _cmd in curl tar openssl systemctl; do
@@ -175,21 +207,19 @@ install_sudoers_dropin() {
   _telemt_backup="${DATA_DIR}/staging/${_telemt_name}.bak"
 
   say "Installing sudoers drop-in for updater operations..."
-  _tmp=$(mktemp)
-  track_tmp "$_tmp"
+  ensure_temp_dir
+  _tmp="$TEMP_DIR/sudoers"
   cat >"$_tmp" <<EOF
 $SYSTEM_USER ALL=(root) NOPASSWD: $_cp -f $PANEL_BINARY_PATH $_panel_backup
 $SYSTEM_USER ALL=(root) NOPASSWD: $_cp -f $_telemt_path $_telemt_backup
-$SYSTEM_USER ALL=(root) NOPASSWD: $_cp -f ${DATA_DIR}/staging/* $_panel_tmp
-$SYSTEM_USER ALL=(root) NOPASSWD: $_cp -f ${DATA_DIR}/staging/* $_telemt_tmp
+$SYSTEM_USER ALL=(root) NOPASSWD: $_cp -f ${DATA_DIR}/staging/${BINARY_NAME} $_panel_tmp
+$SYSTEM_USER ALL=(root) NOPASSWD: $_cp -f ${DATA_DIR}/staging/$_telemt_name $_telemt_tmp
 $SYSTEM_USER ALL=(root) NOPASSWD: $_chmod 0755 $_panel_tmp
 $SYSTEM_USER ALL=(root) NOPASSWD: $_chmod 0755 $_telemt_tmp
 $SYSTEM_USER ALL=(root) NOPASSWD: $_mv -f $_panel_tmp $PANEL_BINARY_PATH
 $SYSTEM_USER ALL=(root) NOPASSWD: $_mv -f $_telemt_tmp $_telemt_path
 $SYSTEM_USER ALL=(root) NOPASSWD: $_rm -f $_panel_tmp
 $SYSTEM_USER ALL=(root) NOPASSWD: $_rm -f $_telemt_tmp
-$SYSTEM_USER ALL=(root) NOPASSWD: $_rm -f ${PANEL_BINARY_PATH}.bak
-$SYSTEM_USER ALL=(root) NOPASSWD: $_rm -f ${_telemt_path}.bak
 $SYSTEM_USER ALL=(root) NOPASSWD: $_systemctl restart $SERVICE_NAME
 $SYSTEM_USER ALL=(root) NOPASSWD: $_systemctl restart $_telemt_service
 $SYSTEM_USER ALL=(root) NOPASSWD: $_systemctl start $SERVICE_NAME
@@ -298,6 +328,7 @@ do_install() {
   # ── Stage 1: Create system user and directories ─────────────────────────
   warn_legacy_install
   create_system_user
+  join_telemt_group
   setup_directories
 
   # ── Stage 2: Detect architecture ─────────────────────────────────────────
@@ -320,8 +351,8 @@ do_install() {
 
   TARBALL="telemt-panel-${ARCH}-linux-gnu.tar.gz"
   URL="https://github.com/$REPO/releases/download/$TAG/$TARBALL"
-  TMP_TAR="/tmp/$TARBALL"
-  track_tmp "$TMP_TAR"
+  ensure_temp_dir
+  TMP_TAR="$TEMP_DIR/$TARBALL"
 
   say "Downloading $TARBALL..."
   curl -fSL "$URL" -o "$TMP_TAR" \
@@ -330,8 +361,7 @@ do_install() {
   # Verify SHA256 checksum if available
   if command -v sha256sum >/dev/null 2>&1; then
     CHECKSUM_URL="https://github.com/$REPO/releases/download/$TAG/checksums.txt"
-    TMP_CHECKSUMS="/tmp/telemt-panel-checksums.txt"
-    track_tmp "$TMP_CHECKSUMS"
+    TMP_CHECKSUMS="$TEMP_DIR/checksums.txt"
     if curl -fsSL "$CHECKSUM_URL" -o "$TMP_CHECKSUMS" 2>/dev/null; then
       say "Verifying SHA256 checksum..."
       EXPECTED=$(grep "$TARBALL" "$TMP_CHECKSUMS" | awk '{print $1}')
@@ -350,9 +380,8 @@ do_install() {
   fi
 
   say "Extracting..."
-  tar -xzf "$TMP_TAR" -C /tmp
-  EXTRACTED="/tmp/telemt-panel-${ARCH}-linux"
-  track_tmp "$EXTRACTED"
+  tar -xzf "$TMP_TAR" -C "$TEMP_DIR"
+  EXTRACTED="$TEMP_DIR/telemt-panel-${ARCH}-linux"
 
   install_binary "$EXTRACTED" "$PANEL_BINARY_PATH"
   say "Installed $PANEL_BINARY_PATH ($TAG)"
