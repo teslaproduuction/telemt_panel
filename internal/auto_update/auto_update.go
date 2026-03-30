@@ -63,12 +63,12 @@ type UpdateConfigRequest struct {
 
 // componentRunner manages one component's auto-update ticker.
 type componentRunner struct {
-	name  string
-	cfg   ComponentConfig
-	state ComponentState
-	check func() (*CheckResult, error)
-	apply func(version string) error
-	mu    sync.Mutex
+	name   string
+	cfg    ComponentConfig
+	state  ComponentState
+	check  func() (*CheckResult, error)
+	apply  func(version string) error
+	mu     sync.Mutex
 	stopCh chan struct{}
 }
 

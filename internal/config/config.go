@@ -11,7 +11,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-
 // AutoUpdateConfig controls automatic update checking for a component.
 type AutoUpdateConfig struct {
 	Enabled       bool   `toml:"enabled"`
@@ -70,22 +69,22 @@ type TLSConfig struct {
 }
 
 type TelemtConfig struct {
-	URL           string `toml:"url"`
-	AuthHeader    string `toml:"auth_header"`
-	BinaryPath    string `toml:"binary_path"`
-	ServiceName   string `toml:"service_name"`
-	GithubRepo    string `toml:"github_repo"`
-	ConfigPath    string `toml:"config_path"`
-	ContainerName string `toml:"container_name"`
+	URL           string           `toml:"url"`
+	AuthHeader    string           `toml:"auth_header"`
+	BinaryPath    string           `toml:"binary_path"`
+	ServiceName   string           `toml:"service_name"`
+	GithubRepo    string           `toml:"github_repo"`
+	ConfigPath    string           `toml:"config_path"`
+	ContainerName string           `toml:"container_name"`
 	AutoUpdate    AutoUpdateConfig `toml:"auto_update"`
 }
 
 type PanelConfig struct {
-	BinaryPath       string `toml:"binary_path"`
-	ServiceName      string `toml:"service_name"`
-	GithubRepo       string `toml:"github_repo"`
-	MaxNewerReleases int    `toml:"max_newer_releases"`
-	MaxOlderReleases int    `toml:"max_older_releases"`
+	BinaryPath       string           `toml:"binary_path"`
+	ServiceName      string           `toml:"service_name"`
+	GithubRepo       string           `toml:"github_repo"`
+	MaxNewerReleases int              `toml:"max_newer_releases"`
+	MaxOlderReleases int              `toml:"max_older_releases"`
 	AutoUpdate       AutoUpdateConfig `toml:"auto_update"`
 }
 

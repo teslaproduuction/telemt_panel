@@ -4,10 +4,10 @@ import "testing"
 
 func TestParseVersion(t *testing.T) {
 	tests := []struct {
-		input              string
+		input               string
 		major, minor, patch int
-		pre                string
-		wantErr            bool
+		pre                 string
+		wantErr             bool
 	}{
 		{"v1.2.3", 1, 2, 3, "", false},
 		{"1.2.3", 1, 2, 3, "", false},
@@ -46,9 +46,9 @@ func TestCompareVersions(t *testing.T) {
 		{"v1.0.0", "v1.0.1", -1},
 		{"v2.0.0", "v1.9.9", 1},
 		{"v1.2.0", "v1.1.9", 1},
-		{"3.3.10", "v3.3.9", 1},       // bare vs prefixed
-		{"v1.0.0", "v1.0.0-rc1", 1},   // release > pre-release
-		{"v1.0.0-rc1", "v1.0.0", -1},  // pre-release < release
+		{"3.3.10", "v3.3.9", 1},         // bare vs prefixed
+		{"v1.0.0", "v1.0.0-rc1", 1},     // release > pre-release
+		{"v1.0.0-rc1", "v1.0.0", -1},    // pre-release < release
 		{"v1.0.0-rc2", "v1.0.0-rc1", 1}, // pre-release lexicographic
 	}
 	for _, tt := range tests {

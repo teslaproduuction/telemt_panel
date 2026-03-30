@@ -43,13 +43,13 @@ func TestBuildReleasesResult(t *testing.T) {
 		makeRelease("v1.5.0", false, false, true),
 		makeRelease("v1.4.0-rc1", true, false, true),
 		makeRelease("v1.3.0", false, false, true),
-		makeRelease("v1.2.0", false, false, true),  // current
+		makeRelease("v1.2.0", false, false, true), // current
 		makeRelease("v1.1.0", false, false, true),
 		makeRelease("v1.0.0", false, false, true),
 		makeRelease("v0.9.0", false, false, true),
 		makeRelease("v0.8.0", false, false, true),
 		makeRelease("v0.7.0", false, false, true),
-		makeRelease("v0.6.0", false, false, true),  // 8th older — should be excluded (limit 5)
+		makeRelease("v0.6.0", false, false, true), // 8th older — should be excluded (limit 5)
 	}
 
 	result := buildReleasesResult(releases, "v1.2.0", testMatcher, ReleaseLimits{MaxNewer: 10, MaxOlder: 5})
@@ -86,8 +86,8 @@ func TestBuildReleasesResult(t *testing.T) {
 func TestBuildReleasesResult_FiltersDraftsAndMissingAssets(t *testing.T) {
 	releases := []GitHubRelease{
 		makeRelease("v2.0.0", false, true, true),   // draft — excluded
-		makeRelease("v1.5.0", false, false, false),  // no asset — excluded
-		makeRelease("v1.4.0", false, false, true),   // valid
+		makeRelease("v1.5.0", false, false, false), // no asset — excluded
+		makeRelease("v1.4.0", false, false, true),  // valid
 	}
 
 	result := buildReleasesResult(releases, "v1.0.0", testMatcher, ReleaseLimits{MaxNewer: 10, MaxOlder: 10})

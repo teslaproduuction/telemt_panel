@@ -37,10 +37,10 @@ type ClientMsg struct {
 
 // ServerMsg is a message to the client.
 type ServerMsg struct {
-	Type      string   `json:"type"`             // "line", "history", "status", "error"
-	Data      string   `json:"data,omitempty"`   // single line
-	Lines     []string `json:"lines,omitempty"`  // history lines
-	Count     int      `json:"count,omitempty"`  // history count
+	Type      string   `json:"type"`            // "line", "history", "status", "error"
+	Data      string   `json:"data,omitempty"`  // single line
+	Lines     []string `json:"lines,omitempty"` // history lines
+	Count     int      `json:"count,omitempty"` // history count
 	Streaming bool     `json:"streaming,omitempty"`
 	Message   string   `json:"message,omitempty"` // error message
 	Timestamp int64    `json:"timestamp"`

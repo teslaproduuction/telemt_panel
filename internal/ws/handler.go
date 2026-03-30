@@ -13,11 +13,11 @@ import (
 )
 
 func removeProtocol(rawURL string) (string, error) {
-    parsed, err := url.Parse(rawURL)
-    if err != nil {
-        return "", err
-    }
-    return parsed.Host, nil
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	return parsed.Host, nil
 }
 
 var upgrader = websocket.Upgrader{
@@ -32,21 +32,21 @@ var upgrader = websocket.Upgrader{
 		}
 
 		origin, _ = removeProtocol(origin)
-		
+
 		return origin == host
 	},
 }
 
 // ClientMessage is sent by the browser to subscribe to endpoints.
 type ClientMessage struct {
-	Type      string   `json:"type"`               // "subscribe"
+	Type      string   `json:"type"`                // "subscribe"
 	Endpoints []string `json:"endpoints,omitempty"` // e.g. ["/v1/health", "/v1/stats/summary"]
 	Interval  int      `json:"interval,omitempty"`  // poll interval in seconds (default 5)
 }
 
 // ServerMessage is pushed to the browser with fresh data.
 type ServerMessage struct {
-	Type      string      `json:"type"`      // "data" or "error"
+	Type      string      `json:"type"` // "data" or "error"
 	Endpoint  string      `json:"endpoint"`
 	Data      interface{} `json:"data,omitempty"`
 	Error     string      `json:"error,omitempty"`
