@@ -343,8 +343,8 @@ export function UsersPage() {
                             <div className="flex flex-col gap-1">
                               {allLinks.map((link, i) => (
                                 <div key={i} className="flex items-center gap-1">
-                                  <CopyButton text={link.url} label={link.label} />
-                                  <CopyButton text={link.url.replace('tg://proxy', 'https://t.me/proxy')} label="t.me" />
+                                  <CopyButton text={link.url.replace('tg://proxy', 'https://t.me/proxy')} label={link.label} />
+                                  <CopyButton text={link.url} label="t.me" />
                                 </div>
                               ))}
                             </div>
@@ -441,8 +441,8 @@ export function UsersPage() {
                       <div className="text-xs text-text-secondary">Proxy Links</div>
                       {allLinks.map((link, i) => (
                         <div key={i} className="flex items-center gap-1">
-                          <CopyButton text={link.url} label={link.label} />
-                          <CopyButton text={link.url.replace('tg://proxy', 'https://t.me/proxy')} label="t.me" />
+                          <CopyButton text={link.url.replace('tg://proxy', 'https://t.me/proxy')} label={link.label} />
+                          <CopyButton text={link.url} label="t.me" />
                         </div>
                       ))}
                     </div>
