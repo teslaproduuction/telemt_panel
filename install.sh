@@ -141,7 +141,7 @@ join_telemt_group() {
   fi
 
   if [ -n "$_telemt_group" ] && [ "$_telemt_group" != "root" ]; then
-    if id -nG "$SYSTEM_USER" 2>/dev/null | grep -qw "$_telemt_group"; then
+    if id -nG "$SYSTEM_USER" 2>/dev/null | tr ' ' '\n' | grep -qx "$_telemt_group"; then
       say "User '$SYSTEM_USER' already in group '$_telemt_group'"
     else
       $SUDO usermod -aG "$_telemt_group" "$SYSTEM_USER" 2>/dev/null \
