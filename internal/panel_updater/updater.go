@@ -50,6 +50,7 @@ type Updater struct {
 	binaryPath     string
 	serviceName    string
 	githubRepo     string
+	githubToken    string
 	releaseLimits  github.ReleaseLimits
 	statusFilePath string
 }
@@ -108,7 +109,7 @@ func (u *Updater) loadStatusFromPath(path string) bool {
 	return true
 }
 
-func New(currentVersion, binaryPath, serviceName, githubRepo, dataDir string, maxNewer, maxOlder int) *Updater {
+func New(currentVersion, binaryPath, serviceName, githubRepo, dataDir string, maxNewer, maxOlder int, githubToken string) *Updater {
 	if maxNewer <= 0 {
 		maxNewer = github.DefaultMaxNewerReleases
 	}
@@ -134,6 +135,7 @@ func New(currentVersion, binaryPath, serviceName, githubRepo, dataDir string, ma
 		binaryPath:     binaryPath,
 		serviceName:    serviceName,
 		githubRepo:     githubRepo,
+		githubToken:    githubToken,
 		releaseLimits:  github.ReleaseLimits{MaxNewer: maxNewer, MaxOlder: maxOlder},
 		statusFilePath: statusFile,
 	}
@@ -189,7 +191,7 @@ func (u *Updater) setError(err error) {
 
 func (u *Updater) Releases() (*github.ReleasesResult, error) {
 	owner, repo := splitOwnerRepo(u.githubRepo)
-	return github.FetchReleases(owner, repo, u.currentVersion, NewAssetMatcher(), u.releaseLimits)
+	return github.FetchReleases(owner, repo, u.currentVersion, NewAssetMatcher(), u.releaseLimits, u.githubToken)
 }
 
 func (u *Updater) Check() (*CheckResult, error) {
@@ -244,10 +246,10 @@ func (u *Updater) applyAsync(version string) {
 	var err error
 	if version != "" {
 		u.appendLog(fmt.Sprintf("Fetching release %s...", version))
-		release, err = github.FetchRelease(owner, repoName, version, NewAssetMatcher())
+		release, err = github.FetchRelease(owner, repoName, version, NewAssetMatcher(), u.githubToken)
 	} else {
 		u.appendLog("Fetching latest release...")
-		result, fetchErr := github.FetchReleases(owner, repoName, u.currentVersion, NewAssetMatcher(), u.releaseLimits)
+		result, fetchErr := github.FetchReleases(owner, repoName, u.currentVersion, NewAssetMatcher(), u.releaseLimits, u.githubToken)
 		if fetchErr != nil {
 			err = fetchErr
 		} else {

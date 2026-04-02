@@ -83,6 +83,7 @@ type PanelConfig struct {
 	BinaryPath       string           `toml:"binary_path"`
 	ServiceName      string           `toml:"service_name"`
 	GithubRepo       string           `toml:"github_repo"`
+	GithubToken      string           `toml:"github_token"`
 	MaxNewerReleases int              `toml:"max_newer_releases"`
 	MaxOlderReleases int              `toml:"max_older_releases"`
 	AutoUpdate       AutoUpdateConfig `toml:"auto_update"`

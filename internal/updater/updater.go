@@ -53,10 +53,11 @@ type Updater struct {
 	serviceName   string
 	githubRepo    string
 	authHeader    string
+	githubToken   string
 	releaseLimits github.ReleaseLimits
 }
 
-func New(telemtURL, binaryPath, serviceName, githubRepo, authHeader, dataDir string, maxNewer, maxOlder int) *Updater {
+func New(telemtURL, binaryPath, serviceName, githubRepo, authHeader, dataDir string, maxNewer, maxOlder int, githubToken string) *Updater {
 	if maxNewer <= 0 {
 		maxNewer = github.DefaultMaxNewerReleases
 	}
@@ -81,6 +82,7 @@ func New(telemtURL, binaryPath, serviceName, githubRepo, authHeader, dataDir str
 		serviceName:   serviceName,
 		githubRepo:    githubRepo,
 		authHeader:    authHeader,
+		githubToken:   githubToken,
 		releaseLimits: github.ReleaseLimits{MaxNewer: maxNewer, MaxOlder: maxOlder},
 	}
 }
@@ -218,7 +220,7 @@ func (u *Updater) Releases() (*github.ReleasesResult, error) {
 		return nil, fmt.Errorf("fetch current version: %w", err)
 	}
 	owner, repo := splitOwnerRepo(u.githubRepo)
-	return github.FetchReleases(owner, repo, currentVersion, NewAssetMatcher(), u.releaseLimits)
+	return github.FetchReleases(owner, repo, currentVersion, NewAssetMatcher(), u.releaseLimits, u.githubToken)
 }
 
 func (u *Updater) Apply(version string) error {
@@ -253,11 +255,11 @@ func (u *Updater) applyAsync(version string) {
 	var release *github.ReleaseInfo
 	if version != "" {
 		u.appendLog(fmt.Sprintf("Fetching release %s...", version))
-		release, err = github.FetchRelease(owner, repoName, version, NewAssetMatcher())
+		release, err = github.FetchRelease(owner, repoName, version, NewAssetMatcher(), u.githubToken)
 	} else {
 		u.appendLog("Fetching latest release...")
 		var result *github.ReleasesResult
-		result, err = github.FetchReleases(owner, repoName, currentVersion, NewAssetMatcher(), u.releaseLimits)
+		result, err = github.FetchReleases(owner, repoName, currentVersion, NewAssetMatcher(), u.releaseLimits, u.githubToken)
 		if err == nil {
 			// Find latest non-prerelease
 			for i := range result.Releases {

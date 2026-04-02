@@ -20,7 +20,8 @@ type ReleaseLimits struct {
 }
 
 // FetchReleases fetches releases from GitHub and returns filtered, sorted results.
-func FetchReleases(owner, repo, currentVersion string, match AssetMatcher, limits ReleaseLimits) (*ReleasesResult, error) {
+// token is optional: when non-empty it is sent as "Bearer <token>" to raise the rate limit.
+func FetchReleases(owner, repo, currentVersion string, match AssetMatcher, limits ReleaseLimits, token string) (*ReleasesResult, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases?per_page=30", owner, repo)
 
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -29,6 +30,9 @@ func FetchReleases(owner, repo, currentVersion string, match AssetMatcher, limit
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -50,7 +54,8 @@ func FetchReleases(owner, repo, currentVersion string, match AssetMatcher, limit
 }
 
 // FetchRelease fetches a single release by tag name.
-func FetchRelease(owner, repo, tag string, match AssetMatcher) (*ReleaseInfo, error) {
+// token is optional: when non-empty it is sent as "Bearer <token>" to raise the rate limit.
+func FetchRelease(owner, repo, tag string, match AssetMatcher, token string) (*ReleaseInfo, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/tags/%s", owner, repo, tag)
 
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -59,6 +64,9 @@ func FetchRelease(owner, repo, tag string, match AssetMatcher) (*ReleaseInfo, er
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {

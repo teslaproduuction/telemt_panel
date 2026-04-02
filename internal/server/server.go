@@ -241,6 +241,7 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		s.cfg.DataDir,
 		s.cfg.Panel.MaxNewerReleases,
 		s.cfg.Panel.MaxOlderReleases,
+		s.cfg.Panel.GithubToken,
 	)
 
 	mux.Handle("GET /api/update/check", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -288,6 +289,7 @@ func (s *Server) Run(version string, distFS fs.FS) error {
 		s.cfg.DataDir,
 		s.cfg.Panel.MaxNewerReleases,
 		s.cfg.Panel.MaxOlderReleases,
+		s.cfg.Panel.GithubToken,
 	)
 
 	mux.Handle("GET /api/panel/update/check", auth.RequireAuth(jwtSecret, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
