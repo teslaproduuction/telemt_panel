@@ -107,7 +107,7 @@ func (p *TelemtProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // diagnostic info: URL, whether auth is configured, HTTP status, response body.
 func (p *TelemtProxy) ConnectivityCheck() map[string]interface{} {
 	result := map[string]interface{}{
-		"telemt_url":    p.targetURL,
+		"telemt_url":      p.targetURL,
 		"auth_configured": p.authHeader != "",
 	}
 
