@@ -29,7 +29,7 @@ func TestNewLoadsLegacyStatusFileWhenDataDirConfigured(t *testing.T) {
 	writeJSONFile(t, legacyPath, status)
 
 	dataDir := t.TempDir()
-	upd := New("1.0.0", "/opt/bin/telemt-panel", "telemt-panel", "owner/repo", dataDir, 1, 1)
+	upd := New("1.0.0", "/opt/bin/telemt-panel", "telemt-panel", "owner/repo", dataDir, 1, 1, "")
 
 	got := upd.GetStatus()
 	if got.Phase != PhaseDone {
@@ -69,7 +69,7 @@ func TestNewCleansRecoveredStagedBackup(t *testing.T) {
 		t.Fatalf("write backup: %v", err)
 	}
 
-	upd := New("1.0.0", binaryPath, "telemt-panel", "owner/repo", dataDir, 1, 1)
+	upd := New("1.0.0", binaryPath, "telemt-panel", "owner/repo", dataDir, 1, 1, "")
 	if got := upd.GetStatus(); got.Phase != PhaseDone {
 		t.Fatalf("expected recovered phase %q, got %q", PhaseDone, got.Phase)
 	}

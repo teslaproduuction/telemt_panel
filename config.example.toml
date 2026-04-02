@@ -42,6 +42,14 @@ auth_header = "your-telemt-api-secret"
 # service_name = "telemt-panel"
 # GitHub repository for update checks (default: amirotin/telemt_panel)
 # github_repo = "amirotin/telemt_panel"
+#
+# GitHub API token (optional, but recommended).
+# Without a token, GitHub API allows only 60 requests/hour per IP — shared
+# across all tools on the server. With a token the limit rises to 5000/hour.
+# Use a fine-grained Personal Access Token with no scopes (read-only metadata
+# is enough for public repositories):
+#   https://github.com/settings/personal-access-tokens/new
+# github_token = "ghp_xxxxxxxxxxxxxxxxxxxx"
 
 # [panel.auto_update]
 # enabled = false
